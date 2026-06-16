@@ -287,13 +287,18 @@ Route::group(['middleware' => ['auth']], function() {
     //     Route::get('/reports/getVendoroneviewPDF/{id}/{datefrom}/{dateto}/{function}', [App\Http\Controllers\ReportController::class, 'getVendoroneviewPDF'])->name('getVendoroneviewPDF');
     // });
     Route::group(['middleware' => ['permission:report']], function() {
+        // New report pages (must be before resource to avoid {report} wildcard capturing them)
+        Route::get('/reports/daily-sales',             [App\Http\Controllers\ReportController::class, 'dailySalesForm'])->name('reports.daily-sales');
+        Route::post('/reports/daily-sales/pdf',        [App\Http\Controllers\ReportController::class, 'dailySalesPdf'])->name('reports.daily-sales.pdf');
+        Route::get('/reports/customer-purchase',       [App\Http\Controllers\ReportController::class, 'customerPurchaseForm'])->name('reports.customer-purchase');
+        Route::post('/reports/customer-purchase/pdf',  [App\Http\Controllers\ReportController::class, 'customerPurchasePdf'])->name('reports.customer-purchase.pdf');
+
         Route::resource('reports', App\Http\Controllers\ReportController::class);
         Route::post('/reports/run', [App\Http\Controllers\ReportController::class, 'run']);
         Route::get('/showreport/{id}', [App\Http\Controllers\ReportController::class, 'report'])->name('showreport');
         Route::get('/report/sellerinformationrecord', [App\Http\Controllers\ReportController::class, 'seller_information_record'])->name('seller_information_record');
         Route::get('/report/customerstatementofaccount', [App\Http\Controllers\ReportController::class, 'customer_statement_of_account'])->name('customer_statement_of_account');
         Route::get('/report/daily_sales_report_excel', [App\Http\Controllers\ReportController::class, 'daily_sales_report_excel'])->name('daily_sales_report_excel');
-
     });
     // Route::group(['middleware' => ['permission:report|paymentdetail']], function() {
     //     Route::resource('reports', App\Http\Controllers\ReportController::class);
@@ -459,8 +464,8 @@ Route::group(['middleware' => ['auth']], function() {
         Route::resource('taskTransfers', App\Http\Controllers\TaskTransferController::class);
     });
     Route::group(['middleware' => ['permission:trip']], function() {
+        Route::get('trips/{id}/report', [App\Http\Controllers\TripController::class, 'report'])->name('trips.report');
         Route::resource('trips', App\Http\Controllers\TripController::class);
-
     });
     Route::group(['middleware' => ['permission:inventorybalance']], function() {
         Route::get('/inventoryBalances', [App\Http\Controllers\InventoryBalanceController::class, 'index'])->name('inventoryBalances.index');

@@ -22,8 +22,8 @@ class TripDataTable extends DataTable
       return $dataTable->addColumn('action', function ($row) {
         if ($row->type == 2) {
             return '<div class="btn-group">
-                        <a href="' . route('trips.show', Crypt::encrypt($row->id)) . '" class="btn btn-ghost-success">
-                            <i class="fa fa-eye"></i>
+                        <a href="' . route('trips.report', Crypt::encrypt($row->id)) . '" target="_blank" class="btn btn-sm btn-primary">
+                            <i class="fa fa-file-pdf-o"></i> Report
                         </a>
                     </div>';
         } else {
@@ -129,7 +129,7 @@ class TripDataTable extends DataTable
                     // ],
                     [
                         'targets' => 6,
-                        'render' => 'function(data, type){return data == 1 ? "Start Trip" : "End Trip";}'
+                        'render' => 'function(data, type){return data == 1 ? "<span class=\"badge badge-success\">Start Trip</span>" : "<span class=\"badge badge-warning\">End Trip</span>";}'
                     ],
                     
                 ],

@@ -33,6 +33,7 @@ use App\Models\InvoicePayment;
 use App\Models\Customer;
 use App\Models\Agent;
 use App\Models\Product;
+use App\Models\Company;
 use App\Exports\SellerInformationExport;
 use App\Exports\MonthlySaleReport;
 use App\Exports\DailySaleReportExport;
@@ -882,5 +883,131 @@ class ReportController extends AppBaseController
 
     }
 
+    // ── Daily Sales Report ─────────────────────────────────────────────────────
+
+    public function dailySalesForm()
+    {
+        $drivers      = Driver::orderBy('name')->get();
+        $customers    = Customer::orderBy('company')->get();
+        $paymentTerms = Customer::PAYMENT_TERMS;
+        $reportType   = 'daily_sales';
+        return view('reports.report_filters', compact('drivers', 'customers', 'paymentTerms', 'reportType'));
+    }
+
+    public function dailySalesPdf(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'required|date',
+            'date_to'   => 'required|date|after_or_equal:date_from',
+        ]);
+
+        $dateFrom    = $request->date_from;
+        $dateTo      = $request->date_to;
+        $driverId    = $request->driver_id    ?: null;
+        $customerId  = $request->customer_id  ?: null;
+        $paymentType = $request->payment_type ?: null;
+
+        $query = Invoice::whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
+            ->where('status', 1)
+            ->with(['customer', 'driver', 'invoicedetail.product']);
+
+        if ($driverId)    $query->where('driver_id', $driverId);
+        if ($customerId)  $query->where('customer_id', $customerId);
+        if ($paymentType) $query->where('paymentterm', $paymentType);
+
+        $invoices = $query->orderBy('date')->get();
+
+        $paymentLabels = Customer::PAYMENT_TERMS;
+        $breakdown     = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+        foreach ($invoices as $invoice) {
+            $term = (int) $invoice->paymentterm;
+            if (array_key_exists($term, $breakdown)) {
+                $breakdown[$term] += $invoice->invoicedetail->sum('totalprice');
+            }
+        }
+        $grandTotal = array_sum($breakdown);
+
+        $filterDriver   = $driverId    ? (Driver::find($driverId)?->name ?? 'All')   : 'All';
+        $filterCustomer = $customerId  ? (Customer::find($customerId)?->company ?? 'All') : 'All';
+        $filterPayment  = $paymentType ? ($paymentLabels[$paymentType] ?? 'All')      : 'All';
+
+        $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
+
+        $pdf = Pdf::loadView('reports.daily_sales_pdf', compact(
+            'invoices', 'breakdown', 'grandTotal', 'paymentLabels',
+            'dateFrom', 'dateTo', 'filterDriver', 'filterCustomer', 'filterPayment', 'company'
+        ))->setPaper('a4', 'landscape');
+
+        return $pdf->stream('daily-sales-report-' . $dateFrom . '-to-' . $dateTo . '.pdf');
+    }
+
+    // ── Customer Purchase History ──────────────────────────────────────────────
+
+    public function customerPurchaseForm()
+    {
+        $drivers      = Driver::orderBy('name')->get();
+        $customers    = Customer::orderBy('company')->get();
+        $paymentTerms = Customer::PAYMENT_TERMS;
+        $reportType   = 'customer_purchase';
+        return view('reports.report_filters', compact('drivers', 'customers', 'paymentTerms', 'reportType'));
+    }
+
+    public function customerPurchasePdf(Request $request)
+    {
+        $request->validate([
+            'date_from'   => 'required|date',
+            'date_to'     => 'required|date|after_or_equal:date_from',
+            'customer_id' => 'required|integer|exists:customers,id',
+        ]);
+
+        $dateFrom    = $request->date_from;
+        $dateTo      = $request->date_to;
+        $customerId  = $request->customer_id;
+        $driverId    = $request->driver_id    ?: null;
+        $paymentType = $request->payment_type ?: null;
+
+        $customer = Customer::findOrFail($customerId);
+
+        $query = Invoice::whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
+            ->where('status', 1)
+            ->where('customer_id', $customerId)
+            ->with(['driver', 'invoicedetail.product']);
+
+        if ($driverId)    $query->where('driver_id', $driverId);
+        if ($paymentType) $query->where('paymentterm', $paymentType);
+
+        $invoices = $query->orderBy('date')->get();
+
+        // Build monthly summary
+        $monthlyMap = [];
+        foreach ($invoices as $invoice) {
+            $monthKey    = Carbon::parse($invoice->date)->format('Y-m');
+            $monthLabel  = Carbon::parse($invoice->date)->format('F Y');
+            $invoiceQty  = $invoice->invoicedetail->sum('quantity');
+            $invoiceAmt  = $invoice->invoicedetail->sum('totalprice');
+
+            if (!isset($monthlyMap[$monthKey])) {
+                $monthlyMap[$monthKey] = ['month' => $monthLabel, 'frequency' => 0, 'total_qty' => 0, 'total_amount' => 0];
+            }
+            $monthlyMap[$monthKey]['frequency']++;
+            $monthlyMap[$monthKey]['total_qty']    += $invoiceQty;
+            $monthlyMap[$monthKey]['total_amount'] += $invoiceAmt;
+        }
+        ksort($monthlyMap);
+        $monthlySummary = array_values($monthlyMap);
+
+        $paymentLabels = Customer::PAYMENT_TERMS;
+        $filterDriver  = $driverId    ? (Driver::find($driverId)?->name ?? 'All')    : 'All';
+        $filterPayment = $paymentType ? ($paymentLabels[$paymentType] ?? 'All')       : 'All';
+
+        $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
+
+        $pdf = Pdf::loadView('reports.customer_purchase_pdf', compact(
+            'customer', 'invoices', 'monthlySummary', 'paymentLabels',
+            'dateFrom', 'dateTo', 'filterDriver', 'filterPayment', 'company'
+        ))->setPaper('a4', 'portrait');
+
+        return $pdf->stream('customer-purchase-' . str_replace(' ', '-', $customer->company) . '-' . $dateFrom . '-to-' . $dateTo . '.pdf');
+    }
 
 }

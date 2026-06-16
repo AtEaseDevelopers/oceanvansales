@@ -72,6 +72,8 @@ Route::group(['prefix' => 'v1'], function () {
     Route::get('/driver/task/listtranfer', [App\Http\Controllers\Api\V1\DriverController::class, 'listtranfer']);
     //dashboard
     Route::post('/driver/dashboard', [App\Http\Controllers\Api\V1\DriverController::class, 'dashboard']);
+    //Trip report PDF (base64)
+    Route::post('/driver/trip/report', [App\Http\Controllers\Api\V1\DriverController::class, 'tripreport']);
 
 
 });

@@ -141,7 +141,8 @@ class InvoiceDataTable extends DataTable
                     [
                     'targets' => 8,
                     'render' => 'function(data, type, row){
-                            return data || \'Unknown\';
+                            var map = {1:"Cash",2:"Credit",3:"Online BankIn",4:"E-wallet",5:"Cheque"};
+                            return map[data] || data || "";
                         }'
                     ],
                     [
@@ -160,7 +161,7 @@ class InvoiceDataTable extends DataTable
                             if(columns[index].title == \'Status\'){
                                 var input = \'<select class="border-0" style="width: 100%;"><option value="1">Completed</option><option value="0">New</option></select>\';
                             }else if(columns[index].title == \'Payment Term\'){
-                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="Cash">Cash</option><option value="Credit">Credit</option><option value="Online BankIn">Online BankIn</option><option value="E-wallet">E-wallet</option></select>\';
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="1">Cash</option><option value="2">Credit</option><option value="3">Online BankIn</option><option value="4">E-wallet</option><option value="5">Cheque</option></select>\';
                             }else if(columns[index].title == \'Date\'){
                                 var input = \'<input type="text" id="\'+index+\'Date" onclick="searchDateColumn(this);" placeholder="Search ">\';
                             }else if(columns[index].title == \'Group\'){

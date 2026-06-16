@@ -15,12 +15,6 @@ class InvoicePayment extends Model
     use HasFactory, BelongsToCompany;
 
     public $table = 'invoice_payments';
-
-    const TYPES = [
-        'cash'           => 'Cash',
-        'online_banking' => 'Online Banking',
-        'touch_n_go'     => "Touch 'n Go",
-    ];
     
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';

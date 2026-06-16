@@ -388,6 +388,7 @@ class DriverController extends Controller
             //     ], 400);
             // }
             $lorry = Lorry::where('id', $data['lorry_id'])->first();
+
             if(empty($lorry)){
                 return response()->json([
                     'result' => false,
@@ -514,7 +515,7 @@ class DriverController extends Controller
             }
             //validation
             $validator = Validator::make($request->all(), [
-                'kelindan_id' => 'required|numeric',
+                'kelindan_id' => 'nullable|numeric',
                 'lorry_id' => 'required|numeric',
                 'cash' => 'required|numeric',
                 'advance_amount' => 'nullable|numeric',
@@ -1748,7 +1749,7 @@ class DriverController extends Controller
             if($data['type'] == 1){
                 $invoicepayment = New InvoicePayment();
                 $invoicepayment->invoice_id = $invoice->id;
-                $invoicepayment->type = 'cash';
+                $invoicepayment->type = $data['type'];
                 $invoicepayment->customer_id = $invoice->customer_id;
                 $invoicepayment->amount = $totalprice;
                 $invoicepayment->status = 1;
@@ -3170,7 +3171,8 @@ class DriverController extends Controller
      public function dashboard(Request $request){
         try{
             $data = $request->all();
-            //check session
+
+            // Check session
             $driver = Driver::where('session', $request->header('session'))->first();
             if(empty($driver)){
                 return response()->json([
@@ -3179,11 +3181,11 @@ class DriverController extends Controller
                     'data' => null
                 ], 401);
             }
-            //validation
+
+            // Validation
             $validator = Validator::make($request->all(), [
                 'date' => 'required|date',
             ]);
-
             if ($validator->fails()) {
                 return response()->json([
                     'result' => false,
@@ -3198,80 +3200,74 @@ class DriverController extends Controller
                     'data' => null
                 ], 400);
             }
-            //process
-            $sales = DB::Select('select sum(a.totalprice) as sales from(select i.id,sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' group by i.id) a')[0]->sales;
-            $cash = DB::Select('select coalesce(sum(coalesce(amount,0)),0) as cash from invoice_payments where type = \'cash\' and status = 1 and driver_id = '.$driver->id.' and approve_at >= "'.$data['date'].'" and approve_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
-            $bank_in = DB::Select('select coalesce(sum(coalesce(bank_in,0)),0) as bank_in from trips where type = 2 and driver_id = '.$driver->id.' and created_at >= "'.$data['date'].'" and created_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->bank_in;
-            $cash_left = DB::Select('select coalesce(sum(coalesce(cash,0)),0) as cash from trips where type = 2 and driver_id = '.$driver->id.' and created_at >= "'.$data['date'].'" and created_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
-            // $credit = DB::select('select sum(a.totalprice) as credit from ( select i.id,sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id left join invoice_payments ip on ip.invoice_id = i.id where i.status = 1 and i.date = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and ip.id is null group by i.id ) a')[0]->credit;
-            $credit = DB::select('select sum(a.totalprice) as credit from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 2 group by i.id ) a')[0]->credit;
-            $bank = DB::select('select sum(a.totalprice) as bank from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 3 group by i.id ) a')[0]->bank;
-            $tng = DB::select('select sum(a.totalprice) as tng from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 4 group by i.id ) a')[0]->tng;
-            $productsold = DB::Select('select sum(id.quantity) as productsold from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and id.totalprice > 0 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id)[0]->productsold;
-            $solddetail = DB::select('select p.name, sum(id.quantity) as quantity, sum(id.totalprice) as price from invoices i left join invoice_details id on id.invoice_id = i.id  left join products p on p.id = id.product_id where i.status = 1 and id.totalprice > 0 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' group by id.product_id, p.id, p.name');
-            $productfoc = DB::Select('select sum(id.quantity) as productsold from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and id.totalprice = 0 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id)[0]->productsold;
-            $focdetail = DB::select('select p.name, sum(id.quantity) as quantity, sum(id.totalprice) as price from invoices i left join invoice_details id on id.invoice_id = i.id left join products p on p.id = id.product_id where i.status = 1 and id.totalprice = 0  and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' group by id.product_id, p.id, p.name');
-            $trip = DB::table('trips as t')
-                ->select([
-                    't.id',
-                    't.advance_amount',  // Make sure this matches your column name exactly
-                    'd.name as driver_name',
-                    'k.name as kelindan_name', 
-                    'l.lorryno'
-                ])
-                ->leftJoin('drivers as d', 'd.id', '=', 't.driver_id')
-                ->leftJoin('kelindans as k', 'k.id', '=', 't.kelindan_id')
-                ->leftJoin('lorrys as l', 'l.id', '=', 't.lorry_id')
-                ->where('t.driver_id', $driver->id)
-                ->where('t.type', 1)
-                ->whereDate('t.date', $data['date'])  // Better date filtering
-                ->get()
-                ->map(function ($trip) {
-                    // Convert null advance_amount to 0 if needed
-                    $trip->advance_amount = $trip->advance_amount ?? 0;
-                    return $trip;
-                });                        
-            $transaction = DB::table('inventory_transactions as i_t')
-            ->join('products as p', 'p.id', '=', 'i_t.product_id')
-            ->join('drivers as d', function($join) use ($driver) {
-                $join->where('d.id', '=', $driver->id)
-                    ->where(DB::raw("SUBSTRING_INDEX(i_t.user, ' ', 1)"), '=', DB::raw('d.employeeid'))
-                    ->where(DB::raw("REPLACE(SUBSTRING_INDEX(SUBSTRING_INDEX(i_t.user, '(', -1), ')', 1), ')', '')"), '=', DB::raw('d.name'));
-            })
-            ->where('i_t.type', 5)
-            ->where('i_t.created_at', '>=', $data['date'] . ' 00:00:00')
-            ->where('i_t.created_at', '<', $data['date'] . ' 23:59:59')
-            ->select('p.name', 'i_t.quantity')
-            ->get();
 
-            // $trip = Trip::where('driver_id', $driver->id)
-            // ->where('date','>=',$data['date'].' 00:00:00')
-            // ->where('date','<',$data['date'].' 23:59:59')
-            // ->where('type',1) 
-            // ->with('driver')
-            // ->with('kelindan')
-            // ->with('lorry')
-            // ->get()
-            // ->toArray();
+            // Get current trip — must match driver->trip_id
+            $trip = null;
+            if($driver->trip_id){
+                $trip = Trip::where('id', $driver->trip_id)
+                    ->where('driver_id', $driver->id)
+                    ->with(['kelindan:id,name', 'lorry:id,lorryno'])
+                    ->first();
+            }
+
+            // Get all completed invoices for the current trip
+            $invoices = collect();
+            if($trip){
+                $invoices = Invoice::where('trip_id', $driver->trip_id)
+                    ->where('status', 1)
+                    ->with('invoicedetail.product')
+                    ->get();
+            }
+
+            // Aggregate sales and break down by payment term (1=Cash,2=Credit,3=Online BankIn,4=E-wallet,5=Cheque)
+            $sales     = 0;
+            $breakdown = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+            $productSoldMap = [];
+
+            foreach($invoices as $invoice){
+                $invoiceTotal = $invoice->invoicedetail->sum('totalprice');
+                $sales += $invoiceTotal;
+
+                $term = (int) $invoice->paymentterm;
+                if(array_key_exists($term, $breakdown)){
+                    $breakdown[$term] += $invoiceTotal;
+                }
+
+                foreach($invoice->invoicedetail as $detail){
+                    if($detail->totalprice > 0 && $detail->product){
+                        $name = $detail->product->name;
+                        $productSoldMap[$name] = ($productSoldMap[$name] ?? 0) + $detail->quantity;
+                    }
+                }
+            }
+
+            // Format product_sold as a flat array
+            $productSold = [];
+            foreach($productSoldMap as $name => $qty){
+                $productSold[] = ['name' => $name, 'quantity' => $qty];
+            }
+
+            // FOC: only for customers assigned to this driver
+            $assignedCustomerIds = Assign::where('driver_id', $driver->id)->pluck('customer_id');
+            $productFoc = foc::whereIn('customer_id', $assignedCustomerIds)
+                ->where('status', 1)
+                ->where('startdate', '<=', date('Y-m-d H:i:s'))
+                ->where('enddate', '>', date('Y-m-d H:i:s'))
+                ->with(['customer:id,company', 'product:id,name', 'freeproduct:id,name'])
+                ->get();
+
             $result = [
-                'sales' => round($sales,2),
-                'cash' => round($cash,2),
-                'cash_left' =>  ceil($cash_left),
-                'bank_in' => round($bank_in,2),
-                'wastage' => $transaction,
-                'credit' => round($credit,2),
-                'onlinebank' =>round($bank,2),
-                'tng' =>round($tng,2),
-                'productsold' => [
-                    'total_quantity' =>round($productsold,2),
-                    'details' =>$solddetail
-                ],
-                'productfoc' => [
-                    'total_quantity' =>round($productfoc,2),
-                    'details' =>$focdetail
-                ],
-                'trip' => $trip
+                'sales'        => round($sales, 2),
+                'cash'         => round($breakdown[1], 2),
+                'credit'       => round($breakdown[2], 2),
+                'onlinebank'   => round($breakdown[3], 2),
+                'ewallet'      => round($breakdown[4], 2),
+                'cheque'       => round($breakdown[5], 2),
+                'product_sold' => $productSold,
+                'product_foc'  => $productFoc,
+                'trip'         => $trip,
             ];
+
             return response()->json([
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.get_dashboard_successfully',
@@ -3366,6 +3362,111 @@ class DriverController extends Controller
                 'data' => $result
             ], 200);
 
+    }
+
+    public function tripreport(Request $request)
+    {
+        try {
+            // Auth
+            $driver = Driver::where('session', $request->header('session'))->first();
+            if (empty($driver)) {
+                return response()->json([
+                    'result'  => false,
+                    'message' => __LINE__ . $this->message_separator . 'Invalid session',
+                    'data'    => null
+                ], 401);
+            }
+
+            // Validation
+            $validator = Validator::make($request->all(), [
+                'trip_id' => 'required|integer',
+            ]);
+            if ($validator->fails()) {
+                return response()->json([
+                    'result'  => false,
+                    'message' => __LINE__ . $this->message_separator . $validator->errors()->first(),
+                    'data'    => null
+                ], 400);
+            }
+
+            // The passed trip_id is the end trip (type=2)
+            $endTrip = Trip::with(['driver', 'kelindan', 'lorry'])
+                ->where('id', $request->trip_id)
+                ->where('driver_id', $driver->id)
+                ->first();
+
+            if (empty($endTrip)) {
+                return response()->json([
+                    'result'  => false,
+                    'message' => __LINE__ . $this->message_separator . 'Trip not found',
+                    'data'    => null
+                ], 404);
+            }
+
+            // Find the matching start trip (type=1) immediately before this end trip
+            $startTrip = Trip::where('driver_id', $driver->id)
+                ->where('type', 1)
+                ->where('id', '<', $endTrip->id)
+                ->orderBy('id', 'desc')
+                ->first();
+
+            // Collect invoices for this trip
+            $invoices = collect();
+            if ($startTrip) {
+                $invoices = Invoice::where('trip_id', $startTrip->id)
+                    ->where('status', 1)
+                    ->with(['customer', 'invoicedetail.product'])
+                    ->get();
+            }
+
+            // Payment breakdown
+            $paymentLabels = Customer::PAYMENT_TERMS;
+            $breakdown     = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+            foreach ($invoices as $invoice) {
+                $term = (int) $invoice->paymentterm;
+                if (array_key_exists($term, $breakdown)) {
+                    $breakdown[$term] += $invoice->invoicedetail->sum('totalprice');
+                }
+            }
+            $grandTotal = array_sum($breakdown);
+
+            // Duration
+            $startTime = $startTrip
+                ? \Carbon\Carbon::parse($startTrip->getRawOriginal('date') ?? $startTrip->date)
+                : null;
+            $endTime  = \Carbon\Carbon::parse($endTrip->getRawOriginal('date') ?? $endTrip->date);
+            $duration = $startTime ? $startTime->diff($endTime) : null;
+
+            // Company
+            $company = \App\Models\Company::find(
+                app()->bound('current_company_id') ? app('current_company_id') : null
+            );
+
+            // Generate PDF and encode to base64
+            $pdf = Pdf::loadView('trips.report', compact(
+                'startTrip', 'endTrip', 'invoices',
+                'breakdown', 'grandTotal', 'paymentLabels',
+                'startTime', 'endTime', 'duration', 'company'
+            ))->setPaper('a4', 'portrait');
+
+            $base64 = base64_encode($pdf->output());
+
+            return response()->json([
+                'result'  => true,
+                'message' => __LINE__ . $this->message_separator . 'Report generated successfully',
+                'data'    => [
+                    'filename' => 'daily-sales-report-' . $endTrip->id . '.pdf',
+                    'pdf'      => $base64,
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'result'  => false,
+                'message' => __LINE__ . $this->message_separator . $e->getMessage(),
+                'data'    => null
+            ], 500);
+        }
     }
 
 }

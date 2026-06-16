@@ -6,6 +6,7 @@ use App\Models\InvoicePayment;
 use Yajra\DataTables\Services\DataTable;
 use Yajra\DataTables\EloquentDataTable;
 use App\Models\Code;
+use App\Models\Customer;
 
 class InvoicePaymentDataTable extends DataTable
 {
@@ -134,7 +135,7 @@ class InvoicePaymentDataTable extends DataTable
                     [
                         'targets' => 3,
                         'render' => 'function(data, type, row){
-                                var types = ' . json_encode(InvoicePayment::TYPES) . ';
+                                var types = ' . json_encode(Customer::PAYMENT_TERMS) . ';
                                 return types[data] || data || \'Unknown\';
                             }'
                     ],
@@ -178,7 +179,7 @@ class InvoicePaymentDataTable extends DataTable
                             if(columns[index].title == \'Status\'){
                                 var input = \'<select class="border-0" style="width: 100%;"><option value="1">Completed</option><option value="0">New</option><option value="2">Canceled</option></select>\';
                             }else if(columns[index].title == \'Type\'){
-                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option>' . collect(InvoicePayment::TYPES)->map(fn($label, $value) => '<option value="' . e($value) . '">' . e($label) . '</option>')->implode('') . '</select>\';
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option>' . collect(Customer::PAYMENT_TERMS)->map(fn($label, $value) => '<option value="' . e($value) . '">' . e($label) . '</option>')->implode('') . '</select>\';
                             }else if(columns[index].title == \'Approve At\'){
                                 var input = \'<input type="text" id="\'+index+\'Date" onclick="searchDateColumn(this);" placeholder="Search ">\';
                             }else if(columns[index].title == \'Date\'){

@@ -13,6 +13,11 @@ use Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Models\Trip;
+use App\Models\Invoice;
+use App\Models\Company;
+use App\Models\Customer;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class TripController extends AppBaseController
 {
@@ -142,6 +147,59 @@ class TripController extends AppBaseController
                 'trip' => $tripList
             ];
         return view('trips.show')->with('trip', (object)$result);
+    }
+
+    public function report($id)
+    {
+        $id = Crypt::decrypt($id);
+
+        // The clicked row is the end trip (type=2)
+        $endTrip = Trip::with(['driver', 'kelindan', 'lorry'])->findOrFail($id);
+
+        // Find the corresponding start trip (type=1) for this driver immediately before the end trip
+        $startTrip = Trip::where('driver_id', $endTrip->driver_id)
+            ->where('type', 1)
+            ->where('id', '<', $endTrip->id)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        // Get all invoices created during this trip
+        $invoices = collect();
+        if ($startTrip) {
+            $invoices = Invoice::where('trip_id', $startTrip->id)
+                ->where('status', 1)
+                ->with(['customer', 'invoicedetail.product'])
+                ->get();
+        }
+
+        // Payment term labels
+        $paymentLabels = \App\Models\Customer::PAYMENT_TERMS;
+
+        // Aggregate payment breakdown
+        $breakdown = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0];
+        foreach ($invoices as $invoice) {
+            $term = (int) $invoice->paymentterm;
+            if (array_key_exists($term, $breakdown)) {
+                $breakdown[$term] += $invoice->invoicedetail->sum('totalprice');
+            }
+        }
+        $grandTotal = array_sum($breakdown);
+
+        // Trip duration
+        $startTime = $startTrip ? Carbon::parse($startTrip->getRawOriginal('date') ?? $startTrip->date) : null;
+        $endTime   = Carbon::parse($endTrip->getRawOriginal('date') ?? $endTrip->date);
+        $duration  = $startTime ? $startTime->diff($endTime) : null;
+
+        // Company info
+        $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
+
+        $pdf = Pdf::loadView('trips.report', compact(
+            'startTrip', 'endTrip', 'invoices',
+            'breakdown', 'grandTotal', 'paymentLabels',
+            'startTime', 'endTime', 'duration', 'company'
+        ))->setPaper('a4', 'portrait');
+
+        return $pdf->stream('daily-sales-report-' . $endTrip->id . '.pdf');
     }
 
     /**
