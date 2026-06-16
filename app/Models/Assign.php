@@ -6,6 +6,7 @@ use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use App\Traits\BelongsToCompany;
 
 /**
  * Class Assign
@@ -19,7 +20,7 @@ class Assign extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'assigns';
     

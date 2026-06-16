@@ -6,14 +6,21 @@ use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use App\Traits\BelongsToCompany;
 
 class InvoicePayment extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'invoice_payments';
+
+    const TYPES = [
+        'cash'           => 'Cash',
+        'online_banking' => 'Online Banking',
+        'touch_n_go'     => "Touch 'n Go",
+    ];
     
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
@@ -47,7 +54,7 @@ class InvoicePayment extends Model
     protected $casts = [
         'id' => 'integer',
         'invoice_id' => 'integer',
-        'type' => 'integer',
+        'type' => 'string',
         'customer_id' => 'integer',
         'amount' => 'float',
         'status' => 'integer',

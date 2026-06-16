@@ -18,7 +18,13 @@ class InventoryTransactionDataTable extends DataTable
     {
         $dataTable = new EloquentDataTable($query);
 
-        return $dataTable->addColumn('action', 'inventory_transactions.datatables_actions');
+        return $dataTable
+            ->addColumn('action', 'inventory_transactions.datatables_actions')
+            ->editColumn('quantity', function ($row) {
+                $color = $row->quantity >= 0 ? '#28a745' : '#dc3545';
+                return '<span style="color:' . $color . ';font-weight:bold">' . $row->quantity . '</span>';
+            })
+            ->rawColumns(['action', 'quantity']);
     }
 
     /**

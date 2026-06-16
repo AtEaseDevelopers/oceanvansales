@@ -19,7 +19,10 @@ class DriverDataTable extends DataTable
     {
         $dataTable = new EloquentDataTable($query);
 
-        return $dataTable->addColumn('action', 'drivers.datatables_actions');
+        return $dataTable
+            ->addColumn('lorry_no', fn($driver) => $driver->lorry->lorryno ?? '-')
+            ->addColumn('on_trip', fn($driver) => $driver->trip_id ? 'Yes' : 'No')
+            ->addColumn('action', 'drivers.datatables_actions');
     }
 
     /**
@@ -30,7 +33,7 @@ class DriverDataTable extends DataTable
      */
     public function query(Driver $model)
     {
-        return $model->newQuery();
+        return $model->newQuery()->with('lorry:id,lorryno');
     }
 
     /**
@@ -112,8 +115,11 @@ class DriverDataTable extends DataTable
                         'render' => 'function(data, type){return "<input type=\'checkbox\' class=\'checkboxselect\' checkboxid=\'"+data+"\'/>";}'
                     ],
                     [
-                    'targets' => 5,
+                    'targets' => 4,
                     'render' => 'function(data, type){return data == 1 ? "Active" : "Unactive";}'],
+                    [
+                    'targets' => 6,
+                    'render' => 'function(data, type){ return data == "Yes" ? "<span class=\"badge badge-success\">Yes</span>" : "<span class=\"badge badge-secondary\">No</span>"; }'],
                 ],
                 'initComplete' => 'function(){
                     var columns = this.api().init().columns;
@@ -167,9 +173,9 @@ class DriverDataTable extends DataTable
             'data' => 'name',
             'name' => 'drivers.name']),
 
-            'ic'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.ic'),
-            'data' => 'ic',
-            'name' => 'drivers.ic']),
+            // 'ic'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.ic'),
+            // 'data' => 'ic',
+            // 'name' => 'drivers.ic']),
             
             'phone'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.phone'),
             'data' => 'phone',
@@ -202,6 +208,18 @@ class DriverDataTable extends DataTable
             'status'=> new \Yajra\DataTables\Html\Column(['title' => trans('drivers.status'),
             'data' => 'status',
             'name' => 'drivers.status']),
+
+            'lorry_no'=> new \Yajra\DataTables\Html\Column(['title' => 'Lorry',
+            'data' => 'lorry_no',
+            'name' => 'lorry.lorryno',
+            'searchable' => false,
+            'orderable' => false]),
+
+            'on_trip'=> new \Yajra\DataTables\Html\Column(['title' => 'On Trip',
+            'data' => 'on_trip',
+            'name' => 'on_trip',
+            'searchable' => false,
+            'orderable' => false]),
 
             'remark'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.remark'),
             'data' => 'remark',

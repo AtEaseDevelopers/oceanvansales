@@ -36,17 +36,7 @@
         tfoot{
             display: table-row-group;
         }
-        /* #dataTableBuilder tfoot th input{
-            width:100%;
-            border:none;
-        }
-        #dataTableBuilder td{
-            padding: 0px !important;
-            vertical-align: middle !important;
-        }
-        #dataTableBuilder th{
-            padding: 0px !important;
-        } */
+
 
         .table.table-striped.table-bordered tfoot th input{
             width:100%;
@@ -105,87 +95,10 @@
         .dataTables_paginate{
             padding-top: 12px !important;
         }
-
-        /* multiline */
-        /* .app-header.navbar{
-            background-color: #ffd64d;
-        }
-        .app-header.navbar .nav-item a{
-            color: black;
-        }
-        .app-header.navbar .navbar-toggler-icon{
-            color: black;
-        }
-        .app-header{
-            border-bottom: 1px solid #ffd64d;
-        }
-        .app-body .sidebar{
-            background-color: #fffaea;
-        }
-        .app-body span{
-            color: black;
-        }
-        .app-body .nav-dropdown-items .nav-link.active{
-            background: #fff1c3;
-        } */
         .app-body .nav-dropdown-items .nav-link.active span{
             /* color: #8a8576; */
         }
-        /* .app-body .nav-dropdown-items .nav-link{
-            background: #fff6d6;
-        }
-        .sidebar .nav-dropdown.open{
-            background: #fff6d6;
-        }
-        .breadcrumb{
-            background: #fffaea;
-            border-bottom: none;
-        }
-        .main{
-            background: #fffaea;
-            border-left: 1px solid #c8ced3;
-        }
-        .app-footer{
-            border-left: 1px solid #c8ced3;
-            background: #fffaea;
-        }
-        .card-body{
-            background: #fff6d6;
-        }
-        .card-header{
-            background: #ffd64d;
-        }
-        .card-header a{
-            color: black;
-        }
-        .card-header a:hover{
-            background-color: #ffd64d;
-        }
-        #dataTableBuilder thead{
-            background: #ffd64d;
-        }
-        #dataTableBuilder tfoot input{
-            background: #fffaea;
-        }
-        #dataTableBuilder tbody .odd{
-            background: white !important;
-        }
-        #dataTableBuilder tbody .even{
-            background: #fffaea !important;
-        }
-        .dt-button-collection .dt-button{
-            background: #fffaea;
-        }
-        .dt-button-collection .dt-button.active{
-            background: #fff1c3;
-        }
-        .dropdown-header{
-            background: #ffd64d;
-            color: black;
-        }
-        .dropdown-item{
-            background-color: #fffaea;
-        } */
+  
         body{
             font-family: sans-serif;
             /* font-size: 16px; */
@@ -494,6 +407,37 @@
     </button>
 
     <ul class="nav navbar-nav ml-auto">
+
+        {{-- Company context indicator --}}
+        @if(Auth::check())
+            @if(Auth::user()->is_super_admin)
+            @php
+                $companies = \App\Models\Company::orderBy('name')->get();
+                $activeCompanyId = session('active_company_id');
+            @endphp
+            <li class="nav-item mr-3 d-flex align-items-center">
+                <form action="{{ route('company.switch') }}" method="POST" class="d-flex align-items-center mb-0">
+                    @csrf
+                    <select name="company_id" onchange="this.form.submit()"
+                        class="form-control form-control-sm"
+                        style="min-width:160px;">
+                        @foreach($companies as $company)
+                            <option value="{{ $company->id }}" {{ $activeCompanyId == $company->id ? 'selected' : '' }}>
+                                {{ $company->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
+            </li>
+            @else
+            <li class="nav-item mr-3 d-flex align-items-center">
+                <span class="badge badge-secondary px-2 py-1" style="font-size:0.8rem;">
+                    <i class="fa fa-building mr-1"></i>{{ Auth::user()->company->name ?? '-' }}
+                </span>
+            </li>
+            @endif
+        @endif
+
         <li class="nav-item dropdown">
             <a class="nav-link" style="margin-right: 10px" data-toggle="dropdown" href="#" role="button"
                aria-haspopup="true" aria-expanded="false">

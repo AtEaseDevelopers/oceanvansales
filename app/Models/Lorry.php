@@ -5,6 +5,7 @@ namespace App\Models;
 use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Traits\BelongsToCompany;
 
 /**
  * Class Lorry
@@ -30,7 +31,7 @@ class Lorry extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'lorrys';
     
@@ -66,7 +67,7 @@ class Lorry extends Model
      * @var array
      */
     public static $rules = [
-        'lorryno' => 'required|string|max:255|unique:lorrys,lorryno',
+        'lorryno' => 'required|string|max:255',
         'status' => 'required',
         'remark' => 'nullable|string|max:255'
     ];

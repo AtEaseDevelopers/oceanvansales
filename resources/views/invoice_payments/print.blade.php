@@ -1,3 +1,9 @@
+@php
+    $companyId = isset($invoice) && !empty($invoice->company_id)
+        ? $invoice->company_id
+        : (app()->bound('current_company_id') ? app('current_company_id') : 1);
+    $logoFile = ($companyId == 1) ? 'logo.png' : 'logo' . $companyId . '.png';
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -26,7 +32,7 @@
         }
 
         .login-image{
-            background-image: url('{{config('app.url')}}/logo.png');
+            background-image: url('{{config('app.url')}}/{{ $logoFile }}');
             width: auto;
             height: 55px;
             background-size: contain;
@@ -120,33 +126,10 @@
                         </td>
                         <td>
                             <p class="ta-r">
-                            @if($invoice['type']==1)
-                                {{ 'Cash' }}
-                            @elseif($invoice['type']==2)
-                                {{ 'Credit'}}
-                            @elseif($invoice['type']==3)
-                                {{ 'Online BankIn'}}
-                            @elseif($invoice['type']==4)
-                                {{ 'E-wallet'}}
-                            @elseif($invoice['type']==5)
-                                {{ 'Cheque'}}
-                            @endif
+                                {{ \App\Models\InvoicePayment::TYPES[$invoice['type']] ?? $invoice['type'] }}
                             </p>
                         </td>
                     </tr>
-                    
-                    @if($invoice['type']==5)
-                    <tr>
-                        <td>
-                            <p>Cheque No</p>
-                        </td>
-                        <td>
-                            <p class="ta-r">
-                            {{ $invoice['chequeno'] }}
-                            </p>
-                        </td>
-                    </tr>
-                    @endif
                     
                     <tr>
                         <td>

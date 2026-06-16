@@ -65,16 +65,10 @@ class InvoicePaymentController extends AppBaseController
     {
         $input = $request->all();
         
-        if($input['type'] == 1 && !isset($input['status'])){
+        if(isset(InvoicePayment::TYPES[$input['type']]) && !isset($input['status'])){
             $input['status'] = 1;
             $input['approve_by'] = Auth::user()->email;
             $input['approve_at'] = gmdate("Y-m-d H:i:s");
-        }
-
-        if($input['type'] == 2 && !isset($input['status'])){
-            $input['status'] = 0;
-            $input['approve_by'] = null;
-            $input['approve_at'] = null;
         }
 
         if(isset($input['status'])){

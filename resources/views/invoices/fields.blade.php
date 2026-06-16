@@ -54,10 +54,10 @@
 
 
 <!-- Supervisor Id Field -->
-<div class="form-group col-sm-6">
+<!-- <div class="form-group col-sm-6">
     {!! Form::label('supervisor_id',  __('invoices.supervisor'))  !!}
     {!! Form::select('supervisor_id', $supervisorItems, null, ['class' => 'form-control select2-supervisor', 'placeholder' => 'Pick a Supervisor...']) !!}
-</div>
+</div> -->
 
 
 <!-- Paymentterm Field -->
@@ -100,6 +100,17 @@
                 $('form a.btn-secondary')[0].click();
             }
         });
+
+        var customerPaymentTerms = {!! json_encode($customerPaymentTerms) !!};
+
+        function fillPaymentTerm(customerId) {
+            if (!customerId) return;
+            var term = customerPaymentTerms[customerId];
+            if (term) {
+                $('#paymentterm').val(term).trigger('change');
+            }
+        }
+
         $(document).ready(function () {
             // Initialize all select2 fields
             $('.select2-customer').select2({
@@ -107,31 +118,38 @@
                 allowClear: true,
                 width: '100%'
             });
-            
+
             $('.select2-driver').select2({
                 placeholder: "Search for a driver...",
                 allowClear: true,
                 width: '100%'
             });
-            
+
             $('.select2-kelindan').select2({
                 placeholder: "Search for a kelindan...",
                 allowClear: true,
                 width: '100%'
             });
-            
+
             $('.select2-agent').select2({
                 placeholder: "Search for an agent...",
                 allowClear: true,
                 width: '100%'
             });
-            
+
             $('.select2-supervisor').select2({
                 placeholder: "Search for a supervisor...",
                 allowClear: true,
                 width: '100%'
             });
-            
+
+            $('#customer_id').on('select2:select select2:clear', function(e) {
+                fillPaymentTerm(e.type === 'select2:clear' ? null : $(this).val());
+            });
+
+            // Preselect on edit mode
+            fillPaymentTerm($('#customer_id').val());
+
             HideLoad();
         });
         $("#save_exit").click(function(){

@@ -7,17 +7,25 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\DB;
 use App\Models\Code;
+use App\Traits\BelongsToCompany;
 
 class Customer extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'customers';
 
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
+
+    const PAYMENT_TERMS = [
+        1 => 'Cash',
+        2 => 'Credit',
+        3 => 'Online BankIn',
+        4 => 'E-wallet',
+    ];
 
 
     public $appends = [
@@ -46,6 +54,7 @@ class Customer extends Model
         'msic',
         'sst_registration_no',
         'tourism_tax_registration',
+        'address_location',
     ];
 
     /**
@@ -57,15 +66,16 @@ class Customer extends Model
         'id' => 'integer',
         'code' => 'string',
         'company' => 'string',
-        'paymentterm' => 'integer',
+        'paymentterm' => 'string',
         'group' => 'string',
         'agent_id' => 'integer',
         'supervisor_id' => 'integer',
         'phone' => 'string',
         'address' => 'string',
         'status' => 'integer',
-        'sst' => 'string',
-        'tin' => 'string'
+        'sst'              => 'string',
+        'tin'              => 'string',
+        'address_location' => 'string',
     ];
 
     /**
@@ -74,14 +84,15 @@ class Customer extends Model
      * @var array
      */
     public static $rules = [
-        'code' => 'required|string|max:255|unique:customers,code',
+        'code' => 'required|string|max:255',
         'company' => 'required|string|max:255|string|max:255',
         'paymentterm' => 'required',
         'phone' => 'nullable|string|max:20|nullable|string|max:20',
         'address' => 'nullable|string|max:65535|nullable|string|max:65535',
         'status' => 'required',
-        'sst' => 'nullable|string|max:255',
-        'tin' => 'nullable|string|max:255',
+        'sst'              => 'nullable|string|max:255',
+        'tin'              => 'nullable|string|max:255',
+        'address_location' => 'nullable|string|max:2048',
     ];
 
     /**

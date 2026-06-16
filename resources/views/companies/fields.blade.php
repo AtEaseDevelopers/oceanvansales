@@ -16,6 +16,12 @@
     {!! Form::text('ssm', null, ['class' => 'form-control', 'maxlength' => 255]) !!}
 </div>
 
+<!-- Tin Field -->
+<div class="form-group col-sm-6">
+    {!! Form::label('tin', __('companies.tin') . ':') !!}
+    {!! Form::text('tin', null, ['class' => 'form-control', 'maxlength' => 50]) !!}
+</div>
+
 <!-- Address1 Field -->
 <div class="form-group col-sm-6">
     {!! Form::label('address1', __('companies.address1') . ':') !!}
@@ -38,12 +44,6 @@
 <div class="form-group col-sm-6">
     {!! Form::label('address4', __('companies.address4') . ':') !!}
     {!! Form::text('address4', null, ['class' => 'form-control', 'maxlength' => 255]) !!}
-</div>
-
-<!-- Group Id Field -->
-<div class="form-group col-sm-6">
-    {!! Form::label('group_id', __('companies.group') . ':') !!}<span class="asterisk"> *</span>
-    {!! Form::select('group_id', $groups, $company->group_id ?? null, ['class' => 'selectpicker form-control', 'placeholder' =>'Select Group']) !!}
 </div>
 
 <!-- Submit Field -->

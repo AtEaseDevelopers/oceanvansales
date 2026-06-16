@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Company;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
@@ -41,20 +42,30 @@ class LoginController extends Controller
     
     public function authenticated(Request $request)
     {
-        $user = $request->user(); // Get the authenticated user
+        $user = $request->user();
 
-        // Fetch user's role and permissions
-        $role = $user->roles()->first(); // Assuming a "roles" relationship exists
-        $permissions = $role->permissions()->pluck('name')->toArray(); // Get permission names
+        // Set the active company in session on login
+        if (!$user->is_super_admin) {
+            session(['active_company_id' => $user->company_id]);
+        }
+        // Super admin: leave active_company_id unset (null = view all), they switch later
 
-        // Define redirection routes based on permissions or roles
-        if (in_array('inventorybalance', $permissions) && !in_array('invoice', $permissions)) {
-            return redirect()->route('inventoryBalances.index'); // Redirect Inventory Admin
-        } elseif ($role->name === 'admin') {
-            return redirect()->route('invoices.index'); // Redirect Admin
+        // Super admin: default to first company then go to invoices
+        if ($user->is_super_admin) {
+            $firstCompany = Company::orderBy('id')->first();
+            session(['active_company_id' => $firstCompany?->id]);
+            return redirect()->route('invoices.index');
         }
 
-        // Default redirection to home route
+        $role = $user->roles()->first();
+        $permissions = $role ? $role->permissions()->pluck('name')->toArray() : [];
+
+        if (in_array('inventorybalance', $permissions) && !in_array('invoice', $permissions)) {
+            return redirect()->route('inventoryBalances.index');
+        } elseif ($role && $role->name === 'admin') {
+            return redirect()->route('invoices.index');
+        }
+
         return redirect(RouteServiceProvider::HOME);
     }
 }           

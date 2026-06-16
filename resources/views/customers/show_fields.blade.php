@@ -10,22 +10,10 @@
     <p>{{ $customer->company }}</p>
 </div>
 
-@php
-    if($customer->paymentterm == 1){
-        $paymentterm = __('customers.payment_term_cash');
-    }
-    if($customer->paymentterm == 2){
-        $paymentterm = __('customers.payment_term_bankin');
-    }
-    if($customer->paymentterm == 3){
-        $paymentterm = __('customers.payment_term_credit_note');
-    }
-@endphp
-
 <!-- Paymentterm Field -->
 <div class="form-group">
     {!! Form::label('paymentterm', __('customers.payment_term')) !!}:
-    <p>{{ $paymentterm }}</p>
+    <p>{{ $customer->paymentterm ?: '-' }}</p>
 </div>
 
 <!-- Group Field -->

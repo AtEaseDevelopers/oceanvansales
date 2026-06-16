@@ -43,19 +43,7 @@
 <!-- Paymentterm Field -->
 <div class="form-group">
     {!! Form::label('paymentterm', __('invoices.payment_term')) !!}:<span class="asterisk"> *</span>
-    @if($invoice->paymentterm == 1)
-         <p>Cash</p>
-    @elseif($invoice->paymentterm == 2)
-        <p>Credit</p>
-    @elseif($invoice->paymentterm == 3)
-        <p>Online BankIn</p>
-    @elseif($invoice->paymentterm == 4)
-        <p>E-wallet</p>
-    @elseif($invoice->paymentterm == 5)
-        <p>Cheque {{ '-' . $invoice->chequeno}}</p>
-    @else
-        <p>Payment Term: Unknown</p>
-    @endif
+    <p>{{ $invoice->paymentterm ?: 'Unknown' }}</p>
 </div>
 
 <!-- Status Field -->

@@ -6,12 +6,13 @@ use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use App\Traits\BelongsToCompany;
 
 class Driver extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'drivers';
 
@@ -39,6 +40,8 @@ class Driver extends Model
         'remark',
         'session',
         'invoice_runningnumber',
+        'trip_id',
+        'lorry_id',
     ];
 
     protected $hidden = [
@@ -66,6 +69,8 @@ class Driver extends Model
         'status' => 'integer',
         'remark' => 'string',
         'session' => 'string',
+        'trip_id' => 'integer',
+        'lorry_id' => 'integer',
     ];
 
     /**
@@ -74,10 +79,10 @@ class Driver extends Model
      * @var array
      */
     public static $rules = [
-        'employeeid' => 'required|string|max:20|unique:drivers,employeeid',
+        'employeeid' => 'required|string|max:20',
         'password' => 'required|string|max:65535',
         'name' => 'required|string|max:255',
-        'ic' => 'nullable|string|max:20|unique:drivers,ic',
+        'ic' => 'nullable|string|max:20',
         'phone' => 'nullable|string|max:255',
         // 'commissionrate' => 'required|numeric|min:0|max:100',
         'bankdetails1' => 'nullable|string|max:255',
@@ -91,6 +96,11 @@ class Driver extends Model
         'updated_at' => 'nullable',
         'deleted_at' => 'nullable'
     ];
+
+    public function lorry()
+    {
+        return $this->belongsTo(\App\Models\Lorry::class, 'lorry_id', 'id');
+    }
 
     public function getFirstVaccineAttribute($value)
     {

@@ -35,16 +35,16 @@
 </div> -->
 
 <!-- bankdetails1 Field -->
-<div class="form-group">
+<!-- <div class="form-group">
     {!! Form::label('bankdetails1', __('drivers.bank_details_1')) !!}:
     <p>{{ $driver->bankdetails1 }}</p>
-</div>
+</div> -->
 
 <!-- bankdetails2 Field -->
-<div class="form-group">
+<!-- <div class="form-group">
     {!! Form::label('bankdetails2', __('drivers.bank_details_2')) !!}:
     <p>{{ $driver->bankdetails2 }}</p>
-</div>
+</div> -->
 
 <!-- 1vaccine Field -->
 <!-- <div class="form-group">

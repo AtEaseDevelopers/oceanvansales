@@ -16,6 +16,12 @@
     <p>{{ $company->ssm }}</p>
 </div>
 
+<!-- Tin Field -->
+<div class="form-group">
+    {!! Form::label('tin', __('companies.tin') . ':') !!}
+    <p>{{ $company->tin ?: '-' }}</p>
+</div>
+
 <!-- Address1 Field -->
 <div class="form-group">
     {!! Form::label('address1', __('companies.address1') . ':') !!}
@@ -38,12 +44,6 @@
 <div class="form-group">
     {!! Form::label('address4', __('companies.address4') . ':') !!}
     <p>{{ $company->address4 }}</p>
-</div>
-
-<!-- Group Id Field -->
-<div class="form-group">
-    {!! Form::label('group_id', __('companies.group') . ':') !!}
-    <p>{{ $company->group->description }}</p>
 </div>
 
 @push('scripts')

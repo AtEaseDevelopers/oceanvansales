@@ -261,7 +261,7 @@ class CustomerDataTable extends DataTable
                             if(columns[index].title == \'Status\'){
                                 var input = \'<select class="border-0" style="width: 100%;"><option value="1">Active</option><option value="0">Unactive</option></select>\';
                             }else if(columns[index].title == \'Payment Term\'){
-                                var input = \'<select class="border-0" style="width: 100%;"><option value="1">Cash</option><option value="2">Credit Note</option></select>\';
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="Cash">Cash</option><option value="Credit">Credit</option><option value="Online BankIn">Online BankIn</option><option value="E-wallet">E-wallet</option></select>\';
                             }else{
                                 var input = \'<input type="text" placeholder="Search ">\';
                             }

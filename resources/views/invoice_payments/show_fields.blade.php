@@ -7,19 +7,7 @@
 <!-- Type Field -->
 <div class="form-group">
     {!! Form::label('type', __('invoice_payments.type')) !!}:
-    @if($invoicePayment->type == 1)
-         <p>{{ __('invoice_payments.cash') }}</p>
-    @elseif($invoicePayment->type == 2)
-        <p>{{ __('invoice_payments.credit') }}</p>
-    @elseif($invoicePayment->type == 3)
-        <p>{{ __('invoice_payments.online_bankin') }}</p>
-    @elseif($invoicePayment->type == 4)
-        <p>{{ __('invoice_payments.ewallet') }}</p>
-    @elseif($invoicePayment->type == 5)
-        <p>{{ __('invoice_payments.cheque') }} {{ '-' . $invoicePayment->chequeno }}</p>
-    @else
-        <p>{{ __('invoice_payments.payment_term_unknown') }}</p>
-    @endif
+    <p>{{ \App\Models\InvoicePayment::TYPES[$invoicePayment->type] ?? $invoicePayment->type }}</p>
 </div>
 
 <!-- Customer Id Field -->

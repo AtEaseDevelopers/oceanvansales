@@ -155,6 +155,7 @@
                     </div>
 
                     <div class="form-group">
+                        <div id="current-stock-display" class="mb-2 text-left" style="font-size:0.95em;"></div>
                         <label for="quantity" class="col-form-label">{{ __('inventory_balances.transfer_quantity') }}:</label>
                         <div class="input-group mb-3">
                             <div class="input-group-prepend">
@@ -318,7 +319,7 @@
             $('#stockout').find('.lorry-checkbox:checked').each(function() {
                 lorryIds.push($(this).val());
             });
-            
+
             // Get selected product ID
             var productId = $('#selectedProductStockOut').val();
 
@@ -328,18 +329,24 @@
                     url: '{{ ENV("APP_URL") }}' + '/inventoryBalances/getstock/' + lorryIds.join(',') + '/' + productId,
                     type: 'GET',
                     success: function(data) {
-                        if (data.status) {
-                            $('#stockout').find('#quantity').prop('disabled', false);
-                            $('#stockout').find('#quantity').val(data.quantity);
-                        } else {
-                            $('#stockout').find('#quantity').prop('disabled', true);
-                            $('#stockout').find('#quantity').val(data.quantity);
-                            noti('e', 'Warning', data.message);
+                        // Always enable input — negative stock is allowed
+                        var $qtyInput = $('#stockout').find('#quantity');
+                        var $stockDisplay = $('#stockout').find('#current-stock-display');
+                        $qtyInput.prop('disabled', false);
+
+                        var qty = data.quantity;
+                        var color = qty > 0 ? '#28a745' : (qty < 0 ? '#dc3545' : '#6c757d');
+                        $stockDisplay.html('Current Stock: <strong style="color:' + color + '">' + qty + '</strong>');
+
+                        if (data.status === 'negative') {
+                            noti('w', 'Warning', 'Stock is already negative (' + qty + '). Transaction will proceed.');
+                        } else if (!data.status) {
+                            noti('w', 'Warning', 'No stock record found. Stock Out will create a negative balance.');
                         }
                         HideLoad();
                     },
                     error: function(error) {
-                        noti('e', 'Please contact your administrator', error.responseJSON.message);
+                        noti('e', 'Please contact your administrator', error.responseJSON ? error.responseJSON.message : 'Unknown error');
                         HideLoad();
                     }
                 });

@@ -160,7 +160,9 @@ class ViewServiceProvider extends ServiceProvider
         });
         View::composer(['invoices.fields'], function ($view) {
             $customerItems = Customer::orderBy("company")->pluck('company','id')->toArray();
+            $customerPaymentTerms = Customer::pluck('paymentterm','id')->toArray();
             $view->with('customerItems', $customerItems);
+            $view->with('customerPaymentTerms', $customerPaymentTerms);
         });
         View::composer(['assigns.fields','drivers.assign'], function ($view) {
             $customerItems = Customer::where('status',1)->orderBy("company")->pluck('company','id')->toArray();

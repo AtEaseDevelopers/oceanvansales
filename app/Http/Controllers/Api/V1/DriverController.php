@@ -31,9 +31,13 @@ use App\Models\DriverLocation;
 use App\Models\Language;
 use App\Models\MobileTranslationVersion;
 use App\Models\MobileTranslation;
+use App\Traits\CalculatesCustomerCredit;
+use Exception;
 
 class DriverController extends Controller
 {
+    use CalculatesCustomerCredit;
+
     protected $message_separator = "|";
     //Auth
     public function login(Request $request){
@@ -403,6 +407,8 @@ class DriverController extends Controller
                     $newtrip->type = 1;
                     $newtrip->date = date("Y-m-d H:i:s");
                     $newtrip->save();
+                    Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
+                    Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
                     //generate task
                     $assigns = Assign::where('driver_id', $driver->id)->orderby('sequence','asc')->get()->toarray();
                     $count = 1;
@@ -451,6 +457,8 @@ class DriverController extends Controller
                 $newtrip->type = 1;
                 $newtrip->date = date("Y-m-d H:i:s");
                 $newtrip->save();
+                Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
+                Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
                 //generate task
                 $assigns = Assign::where('driver_id', $driver->id)->orderby('sequence','asc')->get()->toarray();
                 $count = 1;
@@ -558,38 +566,32 @@ class DriverController extends Controller
                     $newtrip->type = 2;
                     $newtrip->date = date("Y-m-d H:i:s");
                     $newtrip->save();
+                    Driver::where('id', $driver->id)->update(['trip_id' => null, 'lorry_id' => null]);
+                    Lorry::where('id', $data['lorry_id'])->update(['status' => 1]);
                     //cancelled task
                     $task = Task::where('driver_id', $driver->id)->where('date',date('Y-m-d'))->whereIn('status',[0,1])->update(['trip_id'=>$newtrip->id,'status' => 9]);
                     foreach($data["wastage"] as $wastage) {
                         $inventorybalance = InventoryBalance::where('lorry_id',$trip->lorry_id)->where('product_id',$wastage['product_id'])->first();
                         if(empty($inventorybalance)){
-                            DB::rollback();
-                            return response()->json([
-                                'result' => false,
-                                'message' => __LINE__.$this->message_separator.'Wastage quantity more than available quantity',
-                                'data' => null
-                            ], 400);
+                            // No record yet — create with negative quantity (negative stock allowed)
+                            $inventorybalance = new InventoryBalance();
+                            $inventorybalance->lorry_id = $trip->lorry_id;
+                            $inventorybalance->product_id = $wastage['product_id'];
+                            $inventorybalance->quantity = 0 - $wastage["quantity"];
+                            $inventorybalance->save();
                         }else{
-                            if($inventorybalance->quantity < $wastage["quantity"]){
-                                DB::rollback();
-                                return response()->json([
-                                    'result' => false,
-                                    'message' => __LINE__.$this->message_separator.'Wastage quantity more than available quantity',
-                                    'data' => null
-                                ], 400);
-                            }else{
-                                $inventorybalance->quantity = $inventorybalance->quantity - $wastage["quantity"];
-                                $inventorybalance->save();
-                                $inventorytransaction = New InventoryTransaction();
-                                $inventorytransaction->lorry_id = $trip->lorry_id;
-                                $inventorytransaction->product_id = $wastage["product_id"];
-                                $inventorytransaction->quantity = $wastage["quantity"] * -1;
-                                $inventorytransaction->type = 5;
-                                $inventorytransaction->date = date('Y-m-d H:i:s');
-                                $inventorytransaction->user = $driver->employeeid . " (" . $driver->name . ")";
-                                $inventorytransaction->save();
-                            }
+                            // Decrement regardless — negative balance is allowed
+                            $inventorybalance->quantity = $inventorybalance->quantity - $wastage["quantity"];
+                            $inventorybalance->save();
                         }
+                        $inventorytransaction = New InventoryTransaction();
+                        $inventorytransaction->lorry_id = $trip->lorry_id;
+                        $inventorytransaction->product_id = $wastage["product_id"];
+                        $inventorytransaction->quantity = $wastage["quantity"] * -1;
+                        $inventorytransaction->type = 5;
+                        $inventorytransaction->date = date('Y-m-d H:i:s');
+                        $inventorytransaction->user = $driver->employeeid . " (" . $driver->name . ")";
+                        $inventorytransaction->save();
                     }
                     DB::commit();
                     return response()->json([
@@ -802,7 +804,7 @@ class DriverController extends Controller
             }
             //process
             // $kelindan = Kelindan::where('status',1)->select('id','name')->get()->toarray();
-            $kelindan = DB::select("select k.id, k.name from kelindans k left join ( select driver_id, type, kelindan_id from trips where id in ( select max(id) as id from trips group by driver_id ) ) b on k.id = b.kelindan_id and b.type = 1 where b.kelindan_id is null;");
+            $kelindan = DB::select("select k.id, k.name from kelindans k left join ( select driver_id, type, kelindan_id from trips where id in ( select max(id) as id from trips group by driver_id ) ) b on k.id = b.kelindan_id and b.type = 1 where b.kelindan_id is null and k.company_id = ?;", [$driver->company_id]);
             if(count($kelindan) != 0){
                 return response()->json([
                     'result' => true,
@@ -841,7 +843,7 @@ class DriverController extends Controller
             }
             //process
             // $lorry = Lorry::where('status',1)->select('id','lorryno')->get()->toarray();
-            $lorry = DB::select("select l.id, l.lorryno from lorrys l left join ( select driver_id, type, lorry_id from trips where id in (select max(id) as id from trips group by driver_id) ) b on l.id = b.lorry_id and b.type = 1 where b.lorry_id is null;");
+            $lorry = DB::select("select l.id, l.lorryno from lorrys l left join ( select driver_id, type, lorry_id from trips where id in (select max(id) as id from trips group by driver_id) ) b on l.id = b.lorry_id and b.type = 1 where b.lorry_id is null and l.company_id = ?;", [$driver->company_id]);
             if(count($lorry) != 0){
                 return response()->json([
                     'result' => true,
@@ -910,7 +912,7 @@ class DriverController extends Controller
                 $message = true;
                 foreach($task as $c=>$t){
                     if(asset($t['customer']['id'])){
-                        $task[$c]['customer']['credit'] = round(  (DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$t['customer']['id'].');')[0]->credit ?? 0) ,2);
+                        $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
                         $task[$c]['customer']['product'] = DB::table('products')
                             ->leftJoin('special_prices', function($join) use($t)
@@ -920,6 +922,7 @@ class DriverController extends Controller
                                     $join->on('special_prices.status', '=', DB::raw("'1'"));
                                 })
                             ->where('products.status','1')
+                            ->where('products.company_id', $driver->company_id)
                             ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
                             ->get();
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
@@ -1015,7 +1018,7 @@ class DriverController extends Controller
                 $message = true;
                 foreach($task as $c=>$t){
                     if(asset($t['customer']['id'])){
-                        $task[$c]['customer']['credit'] = round(  (DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$t['customer']['id'].');')[0]->credit ?? 0) ,2);
+                        $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
                         $task[$c]['customer']['product'] = DB::table('products')
                             ->leftJoin('special_prices', function($join) use($t)
@@ -1025,6 +1028,7 @@ class DriverController extends Controller
                                     $join->on('special_prices.status', '=', DB::raw("'1'"));
                                 })
                             ->where('products.status','1')
+                            ->where('products.company_id', $driver->company_id)
                             ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
                             ->get();
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
@@ -1270,6 +1274,7 @@ class DriverController extends Controller
                         $join->on('special_prices.status', '=', DB::raw("'1'"));
                     })
                 ->where('products.status','1')
+                ->where('products.company_id', $driver->company_id)
                 ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
                 ->get();
                 return response()->json([
@@ -1280,6 +1285,7 @@ class DriverController extends Controller
             }else{
                 $product = DB::table('products')
                 ->where('products.status','1')
+                ->where('products.company_id', $driver->company_id)
                 ->select('products.id','products.code','products.name',DB::raw('products.price as "price"'))
                 ->get();
                 return response()->json([
@@ -1311,7 +1317,7 @@ class DriverController extends Controller
                 ], 401);
             }
             //process
-            $customer = DB::select("SELECT customers.*,COALESCE(b.credit,0) as credit FROM customers customers RIGHT JOIN ( SELECT customer_id FROM assigns assigns WHERE driver_id = ".$driver->id." UNION SELECT customer_id FROM invoices invoices WHERE driver_id = ".$driver->id." ) a on a.customer_id = customers.id LEFT JOIN ( select invoices.customer_id, sum(invoice_details.totalprice) as totalprice, COALESCE(paymentsummary.amount,0) as paid, ( sum(invoice_details.totalprice) - COALESCE(paymentsummary.amount,0) ) as credit from invoices left join invoice_details on invoices.id = invoice_details.invoice_id left join ( select invoice_payments.customer_id, sum(COALESCE(invoice_payments.amount,0)) as amount from invoice_payments where invoice_payments.status = 1 group by invoice_payments.customer_id ) as paymentsummary on invoices.customer_id = paymentsummary.customer_id where invoices.status = 1 group by invoices.customer_id, paymentsummary.customer_id, paymentsummary.amount ) b on b.customer_id = customers.id");
+            $customer = DB::select("SELECT customers.*,COALESCE(b.credit,0) as credit FROM customers customers RIGHT JOIN ( SELECT customer_id FROM assigns assigns WHERE driver_id = ? UNION SELECT customer_id FROM invoices invoices WHERE driver_id = ? ) a on a.customer_id = customers.id LEFT JOIN ( select invoices.customer_id, sum(invoice_details.totalprice) as totalprice, COALESCE(paymentsummary.amount,0) as paid, ( sum(invoice_details.totalprice) - COALESCE(paymentsummary.amount,0) ) as credit from invoices left join invoice_details on invoices.id = invoice_details.invoice_id left join ( select invoice_payments.customer_id, sum(COALESCE(invoice_payments.amount,0)) as amount from invoice_payments where invoice_payments.status = 1 group by invoice_payments.customer_id ) as paymentsummary on invoices.customer_id = paymentsummary.customer_id where invoices.status = 1 group by invoices.customer_id, paymentsummary.customer_id, paymentsummary.amount ) b on b.customer_id = customers.id WHERE customers.company_id = ?", [$driver->id, $driver->id, $driver->company_id]);
             if(count($customer) != 0){
                 return response()->json([
                     'result' => true,
@@ -1367,7 +1373,10 @@ class DriverController extends Controller
                     'data' => null], 400);
             }
             //process
-            $customer->customerdetail = DB::select("select i.date,i.id,'Invoice' as type, i.invoiceno as name, sum(COALESCE(id.totalprice,0)) as amount from invoices i left join invoice_details id on i.id = id.invoice_id where i.customer_id = ".$customer->id." group by i.date, i.id, i.invoiceno, i.customer_id union select ip.created_at as date,ip.id, 'Payment' as type, '' as name, ip.amount as amount from invoice_payments ip where ip.customer_id = ".$customer->id.";");
+            $customer->customerdetail = DB::select(
+                "select i.date,i.id,'Invoice' as type, i.invoiceno as name, sum(COALESCE(id.totalprice,0)) as amount from invoices i left join invoice_details id on i.id = id.invoice_id where i.customer_id = ? and i.company_id = ? group by i.date, i.id, i.invoiceno, i.customer_id union select ip.created_at as date,ip.id, 'Payment' as type, '' as name, ip.amount as amount from invoice_payments ip where ip.customer_id = ? and ip.company_id = ?",
+                [$customer->id, $driver->company_id, $customer->id, $driver->company_id]
+            );
             return response()->json([
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.customer_found',
@@ -1436,13 +1445,13 @@ class DriverController extends Controller
             $invoicepayment = New InvoicePayment();
             $invoicepayment->customer_id = $customer->id;
             $invoicepayment->amount = $data['amount'];
-            $invoicepayment->type = 1;
+            $invoicepayment->type = 'cash';
             $invoicepayment->status = 1;
             $invoicepayment->driver_id = $driver->id;
             $invoicepayment->approve_by = $driver->name;
             $invoicepayment->approve_at = date('Y-m-d H:i:s');
             $invoicepayment->save();
-            $invoicepayment->newcredit = round(DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$invoicepayment->customer_id.');')[0]->credit,2);
+            $invoicepayment->newcredit = $this->getCustomerCreditByDate($invoicepayment->customer_id, date('Y-m-d H:i:s'));
             return response()->json([
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.payment_insert_successfully_found',
@@ -1501,27 +1510,8 @@ class DriverController extends Controller
                
                
                   
-             try
-            {
-                $credit = DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');');
-                
-                if($credit)
-                {
-                    $invoice->newcredit = round($credit[0]->credit,2);
-    
-                }
-    
-            }
-            catch(Exception $ex)
-            {
-                 $invoice->newcredit  = 0;
-            }
-            
-               
-               //$invoice->newcredit = round(DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');')[0]->credit,2);
-               
-               
-               
+            $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
+
                 $invoice->customer->groupcompany = DB::table('companies')
                 ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
                 ->select('companies.*')
@@ -1577,25 +1567,8 @@ class DriverController extends Controller
         }else{
             
             
-              try
-            {
-                $credit = DB::select('call ice_spGetCustomerCreditByDate("'.$invoicepayment->updated_at.'",'.$invoicepayment->customer_id.');');
-                
-                if($credit)
-                {
-                    $invoicepayment->newcredit = round($credit[0]->credit,2);
-    
-                }
-    
-            }
-            catch(Exception $ex)
-            {
-                 $invoicepayment->newcredit  = 0;
-            }
-            
-            //$invoicepayment->newcredit = round(DB::select('call ice_spGetCustomerCreditByDate("'.$invoicepayment->created_at.'",'.$invoicepayment->customer_id.');')[0]->credit,2);
-            
-            
+            $invoicepayment->newcredit = $this->getCustomerCreditByDate($invoicepayment->customer_id, (string) $invoicepayment->updated_at);
+
             return response()->json([
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.invoice_payment_found',
@@ -1662,9 +1635,6 @@ class DriverController extends Controller
                 ], 400);
             }
             //process
-            $runningno = Code::where('code','invoicerunningnumber')->first();
-            $runningno->value = intval($runningno->value) + 1;
-            $runningno->save();
             DB::beginTransaction();
             $extinvoice = Invoice::where('id',$data['invoice_id'])->where('status',0)->first();
             $invoiceno = null;
@@ -1681,14 +1651,22 @@ class DriverController extends Controller
             }else{
                 if($data['invoiceno'] != null){
                     $invoiceno = $data['invoiceno'];
-                    $invoicerunningnumber = substr($invoiceno, -6);
-                    if(($driver->invoice_runningnumber <=> $invoicerunningnumber) == -1){
-                        Driver::where('id',$driver->id)->update(['invoice_runningnumber' => $invoicerunningnumber]);
-                    }
-
                 }else{
-                    $invoiceno = "INV".str_pad($runningno->value, 7, '0', STR_PAD_LEFT);
+                    $invoiceno = Invoice::generateInvoiceNo();
                 }
+            }
+            // Reject duplicate invoiceno within same company (BelongsToCompany scope applies automatically)
+            $duplicateQuery = Invoice::where('invoiceno', $invoiceno);
+            if ($id !== null) {
+                $duplicateQuery->where('id', '!=', $id);
+            }
+            if ($duplicateQuery->exists()) {
+                DB::rollback();
+                return response()->json([
+                    'result' => false,
+                    'message' => __LINE__.$this->message_separator.'api.message.invoice_no_already_exists',
+                    'data' => null,
+                ], 400);
             }
             $invoice = new Invoice();
             if($id != null){
@@ -1703,19 +1681,20 @@ class DriverController extends Controller
             $invoice->supervisor_id = $customer->supervisor_id;
             $invoice->paymentterm = $data['type'];
             $invoice->status = 1;
-            $invoice->chequeno = $data['cheque_no'];
+            $invoice->chequeno = $data['cheque_no'] ?? null;
             $invoice->remark = $data['remark'];
+            $invoice->trip_id = $driver->trip_id;
             $invoice->save();
             $totalprice = 0;
             foreach($data['invoicedetail'] as $id){
                 $product = Product::where('id',$id['product_id'])->first();
                 if(empty($product)){
+                    DB::rollback();
                     return response()->json([
                         'result' => false,
                         'message' => __LINE__.$this->message_separator.'api.message.invalid_product',
                         'data' => null
                     ], 400);
-                    DB::rollback();
                 }
                 $invoicedetail = new InvoiceDetail();
                 $invoicedetail->invoice_id = $invoice->id;
@@ -1769,7 +1748,7 @@ class DriverController extends Controller
             if($data['type'] == 1){
                 $invoicepayment = New InvoicePayment();
                 $invoicepayment->invoice_id = $invoice->id;
-                $invoicepayment->type = 1;
+                $invoicepayment->type = 'cash';
                 $invoicepayment->customer_id = $invoice->customer_id;
                 $invoicepayment->amount = $totalprice;
                 $invoicepayment->status = 1;
@@ -1783,26 +1762,8 @@ class DriverController extends Controller
             $iv = Invoice::where('id',$invoice->id)->with('invoicedetail.product')->get()->first();
             
              
-             try
-            {
-                $credit = DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$iv->customer_id.');');
-                
-                if($credit)
-                {
-                    $iv->newcredit = round($credit[0]->credit,2);
-    
-                }
-    
-            }
-            catch(Exception $ex)
-            {
-                 $iv->newcredit  = 0;
-            }
-            
-            
-           //$iv->newcredit = round(DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$iv->customer_id.');')[0]->credit,2);
-            
-            
+            $iv->newcredit = $this->getCustomerCreditByDate($iv->customer_id, date('Y-m-d H:i:s'));
+
             return response()->json([
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
@@ -1859,26 +1820,12 @@ class DriverController extends Controller
             $each = 23;
             $height = (count($invoice['invoicedetail']) * $each) + $min;
     
-            try
-            {
-                $credit = DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');');
-                
-                if($credit)
-                {
-                    $invoice->newcredit = round($credit[0]->credit,2);
-    
-                }
-    
-            }
-            catch(Exception $ex)
-            {
-                 $invoice->newcredit  = 0;
-            }
+            $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
             $invoice->customer->groupcompany = DB::table('companies')
             ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
             ->select('companies.*')
             ->first() ?? null;
-            
+
               $pdf = Pdf::loadView('invoices.print', array(
                     'invoice' => $invoice
                 ));
@@ -1904,10 +1851,7 @@ class DriverController extends Controller
                 'data' => null
             ], 500);
         }
-        
-	  
 	}
-	
 	
 	
      public function addpayment(Request $request){
@@ -1951,9 +1895,17 @@ class DriverController extends Controller
             //process
             
             DB::beginTransaction();
-            
+
             $invoicepayment = New InvoicePayment();
             if(isset($data['invoice_id'])){
+                $linkedInvoice = Invoice::where('id', $data['invoice_id'])->first();
+                if(empty($linkedInvoice)){
+                    return response()->json([
+                        'result' => false,
+                        'message' => __LINE__.$this->message_separator.'api.message.invoice_not_found',
+                        'data' => null,
+                    ], 400);
+                }
                 $invoicepayment->invoice_id = $data['invoice_id'];
             }
             
@@ -1961,7 +1913,7 @@ class DriverController extends Controller
             $invoicepayment->customer_id = $data['customer_id'];
             $invoicepayment->amount = $data['amount'];
             $invoicepayment->status = 1;
-            $invoicepayment->chequeno = $data['cheque_no'];
+            $invoicepayment->chequeno = $data['cheque_no'] ?? null;
             $invoicepayment->driver_id = $driver->id;
             $invoicepayment->approve_by = $driver->name;
             $invoicepayment->approve_at = date('Y-m-d H:i:s');
@@ -1974,25 +1926,8 @@ class DriverController extends Controller
             $iv['payment_no'] = sprintf('PR%05d',$iv->id);
             
             
-             try
-            {
-                $credit = DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$iv->customer_id.');');
-                
-                if($credit)
-                {
-                    $iv->newcredit = round($credit[0]->credit,2);
-    
-                }
-    
-            }
-            catch(Exception $ex)
-            {
-                 $iv->newcredit  = 0;
-            }
-            
-           
-           // $iv->newcredit = round(DB::select('call ice_spGetCustomerCreditByDate("'.date('Y-m-d H:i:s').'",'.$iv->customer_id.');')[0]->credit,2);
-           
+            $iv->newcredit = $this->getCustomerCreditByDate($iv->customer_id, date('Y-m-d H:i:s'));
+
             return response()->json([
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
@@ -2046,27 +1981,13 @@ class DriverController extends Controller
             $min = 450;
             $each = 23;
     
-            try
-            {
-                $credit = DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');');
-                
-                if($credit)
-                {
-                    $invoice->newcredit = round($credit[0]->credit,2);
-    
-                }
-    
-            }
-            catch(Exception $ex)
-            {
-                 $invoice->newcredit  = 0;
-            }
-            
+            $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
+
             $invoice->customer->groupcompany = DB::table('companies')
             ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
             ->select('companies.*')
             ->first() ?? null;
-            
+
             $pdf = Pdf::loadView('invoice_payments.print', array(
                 'invoice' => $invoice
             ));
@@ -2128,6 +2049,13 @@ class DriverController extends Controller
             //    ], 401);
             //}
             //process
+            if(empty($trip)){
+                return response()->json([
+                    'result' => false,
+                    'message' => __LINE__.$this->message_separator.'api.message.trip_had_not_started',
+                    'data' => null
+                ], 400);
+            }
             $inventorybalance = InventoryBalance::where('lorry_id',$trip->lorry_id)
             ->leftjoin('products','products.id','=','inventory_balances.product_id')
             ->get(['inventory_balances.id','inventory_balances.quantity','inventory_balances.product_id','products.name'])->toarray();
@@ -2404,7 +2332,7 @@ class DriverController extends Controller
                 ], 400);
             }
             //process
-            $request = InventoryTransfer::where('from_driver_id', $trip->driver_id)
+            $sentRequests = InventoryTransfer::where('from_driver_id', $trip->driver_id)
             ->where('date', '>=', date('Y-m-d 00:00:00'))
             ->with('product:id,name')
             ->with('todriver:id,name')
@@ -2423,7 +2351,7 @@ class DriverController extends Controller
                 'result' => true,
                 'message' => __LINE__.$this->message_separator.'api.message.transfer_found',
                 'data' => [
-                    'request' => $request,
+                    'request' => $sentRequests,
                     'pending' => $pending
                 ]
             ], 200);
@@ -2509,7 +2437,7 @@ class DriverController extends Controller
             ], 400);
         }
         $todriver = Driver::where('id',$inventorytransfer->to_driver_id)->first();
-        if(empty($fromdriver)){
+        if(empty($todriver)){
             return response()->json([
               'result' => false,
               'message' => __LINE__.$this->message_separator.'api.message.to_driver_not_found',
@@ -3199,7 +3127,7 @@ class DriverController extends Controller
             }
             //process
             $sales = DB::Select('select sum(a.totalprice) as sales from(select i.id,sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' group by i.id) a')[0]->sales;
-            $cash = DB::Select('select coalesce(sum(coalesce(amount,0)),0) as cash from invoice_payments where type = 1 and status = 1 and driver_id = '.$driver->id.' and approve_at >= "'.$data['date'].'" and approve_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
+            $cash = DB::Select('select coalesce(sum(coalesce(amount,0)),0) as cash from invoice_payments where type = \'cash\' and status = 1 and driver_id = '.$driver->id.' and approve_at >= "'.$data['date'].'" and approve_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
             // $credit = DB::select('select sum(a.totalprice) as credit from ( select i.id,sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id left join invoice_payments ip on ip.invoice_id = i.id where i.status = 1 and i.date = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and ip.id is null group by i.id ) a')[0]->credit;
             $credit = DB::select('select sum(a.totalprice) as credit from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 2 group by i.id ) a')[0]->credit;
             $productsold = DB::Select('select sum(id.quantity) as productsold from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id)[0]->productsold;
@@ -3272,14 +3200,13 @@ class DriverController extends Controller
             }
             //process
             $sales = DB::Select('select sum(a.totalprice) as sales from(select i.id,sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' group by i.id) a')[0]->sales;
-            $cash = DB::Select('select coalesce(sum(coalesce(amount,0)),0) as cash from invoice_payments where type = 1 and status = 1 and driver_id = '.$driver->id.' and approve_at >= "'.$data['date'].'" and approve_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
+            $cash = DB::Select('select coalesce(sum(coalesce(amount,0)),0) as cash from invoice_payments where type = \'cash\' and status = 1 and driver_id = '.$driver->id.' and approve_at >= "'.$data['date'].'" and approve_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
             $bank_in = DB::Select('select coalesce(sum(coalesce(bank_in,0)),0) as bank_in from trips where type = 2 and driver_id = '.$driver->id.' and created_at >= "'.$data['date'].'" and created_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->bank_in;
             $cash_left = DB::Select('select coalesce(sum(coalesce(cash,0)),0) as cash from trips where type = 2 and driver_id = '.$driver->id.' and created_at >= "'.$data['date'].'" and created_at < "'.date('Y-m-d', strtotime("+1 day", strtotime($data['date']))).'";')[0]->cash;
             // $credit = DB::select('select sum(a.totalprice) as credit from ( select i.id,sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id left join invoice_payments ip on ip.invoice_id = i.id where i.status = 1 and i.date = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and ip.id is null group by i.id ) a')[0]->credit;
             $credit = DB::select('select sum(a.totalprice) as credit from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 2 group by i.id ) a')[0]->credit;
             $bank = DB::select('select sum(a.totalprice) as bank from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 3 group by i.id ) a')[0]->bank;
             $tng = DB::select('select sum(a.totalprice) as tng from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 4 group by i.id ) a')[0]->tng;
-            $cheque = DB::select('select sum(a.totalprice) as cheque from ( select i.id, sum(id.totalprice) as totalprice from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' and i.paymentterm = 5 group by i.id ) a')[0]->cheque;
             $productsold = DB::Select('select sum(id.quantity) as productsold from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and id.totalprice > 0 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id)[0]->productsold;
             $solddetail = DB::select('select p.name, sum(id.quantity) as quantity, sum(id.totalprice) as price from invoices i left join invoice_details id on id.invoice_id = i.id  left join products p on p.id = id.product_id where i.status = 1 and id.totalprice > 0 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id.' group by id.product_id, p.id, p.name');
             $productfoc = DB::Select('select sum(id.quantity) as productsold from invoices i left join invoice_details id on id.invoice_id = i.id where i.status = 1 and id.totalprice = 0 and DATE(i.date) = "'.$data['date'].'" and i.driver_id = '.$driver->id)[0]->productsold;
@@ -3335,7 +3262,6 @@ class DriverController extends Controller
                 'credit' => round($credit,2),
                 'onlinebank' =>round($bank,2),
                 'tng' =>round($tng,2),
-                'cheque' =>round($cheque,2),
                 'productsold' => [
                     'total_quantity' =>round($productsold,2),
                     'details' =>$solddetail
@@ -3439,6 +3365,7 @@ class DriverController extends Controller
                 'message' => __LINE__.$this->message_separator.'api.message.language_update_successfully',
                 'data' => $result
             ], 200);
-       
-    }   
+
+    }
+
 }

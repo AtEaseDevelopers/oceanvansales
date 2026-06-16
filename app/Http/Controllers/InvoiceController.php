@@ -22,12 +22,15 @@ use App\Models\Trip;
 use App\Models\Product;
 use App\Models\Task;
 use App\Models\Code;
+use App\Traits\CalculatesCustomerCredit;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Session;
 use Exception;
 
 class InvoiceController extends AppBaseController
 {
+    use CalculatesCustomerCredit;
+
     /** @var InvoiceRepository $invoiceRepository*/
     private $invoiceRepository;
 
@@ -73,8 +76,7 @@ class InvoiceController extends AppBaseController
 
         $input['date'] = date_create($input['date']);
         if($input['invoiceno'] == null){
-            Code::where('code','invoicerunningnumber')->first()->increment('value');
-            $input['invoiceno'] = 'INV'.sprintf('%07d',Code::where('code','invoicerunningnumber')->first()->value);
+            $input['invoiceno'] = Invoice::generateInvoiceNo();
         }
 
         $invoice = $this->invoiceRepository->create($input);
@@ -185,8 +187,7 @@ class InvoiceController extends AppBaseController
 
         $input['date'] = date_create($input['date']);
         if($input['invoiceno'] == null){
-            Code::where('code','invoicerunningnumber')->first()->increment('value');
-            $input['invoiceno'] = 'INV'.sprintf('%07d',Code::where('code','invoicerunningnumber')->first()->value);
+            $input['invoiceno'] = Invoice::generateInvoiceNo();
         }
 
         $invoice = $this->invoiceRepository->update($input, $id);
@@ -221,7 +222,7 @@ class InvoiceController extends AppBaseController
 
                     $invoicepayment_new = New InvoicePayment();
                     $invoicepayment_new->invoice_id = $id;
-                    $invoicepayment_new->type = 1;
+                    $invoicepayment_new->type = 'cash';
                     $invoicepayment_new->customer_id = $invoice->customer_id;
                     $invoicepayment_new->amount = $totalAmount;
                     $invoicepayment_new->status = $invoice->status;
@@ -244,7 +245,7 @@ class InvoiceController extends AppBaseController
                 {
                     $invoicepayment_new = New InvoicePayment();
                     $invoicepayment_new->invoice_id = $id;
-                    $invoicepayment_new->type = 1;
+                    $invoicepayment_new->type = 'cash';
                     $invoicepayment_new->customer_id = $invoice->customer_id;
                     $invoicepayment_new->amount = $totalAmount;
                     $invoicepayment_new->status = $invoice->status;
@@ -650,14 +651,16 @@ class InvoiceController extends AppBaseController
         $each = 23;
         $height = (count($invoice['invoicedetail']) * $each) + $min;
 
-        $invoice->newcredit = round(DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');')[0]->credit,2);
+        $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, $invoice->updated_at);
         $invoice->customer->groupcompany = DB::table('companies')
         ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
         ->select('companies.*')
         ->first() ?? null;
+        $company = \App\Models\Company::find($invoice->company_id);
         try{
             $pdf = Pdf::loadView('invoices.print', array(
-                'invoice' => $invoice
+                'invoice' => $invoice,
+                'company' => $company,
             ));
 
             if($function == 'download'){

@@ -89,40 +89,60 @@ class InventoryBalanceController extends AppBaseController
 
     public function getstock($lorry_id,$product_id)
     {
-        $inventoryBalance = InventoryBalance::where('product_id',$product_id)->where('lorry_id',$lorry_id)->first();
-        if(!empty($inventoryBalance)){
-            if($inventoryBalance->quantity > 0){
-                return response()->json(['status' => true, 'message' => 'Stock found!', 'quantity' => $inventoryBalance->quantity]);
-            }else{
-                return response()->json(['status' => false,'message' => 'Stock not found!', 'quantity' => 0]);
+        // Support comma-separated lorry IDs (multi-lorry selection from frontend)
+        $lorryIds = explode(',', $lorry_id);
+        $totalQuantity = 0;
+        foreach ($lorryIds as $lid) {
+            $inventoryBalance = InventoryBalance::where('product_id',$product_id)->where('lorry_id',$lid)->first();
+            if (!empty($inventoryBalance)) {
+                $totalQuantity += $inventoryBalance->quantity;
             }
-        }else{
-            return response()->json(['status' => false, 'message' => 'Stock not found!', 'quantity' => 0]);
+        }
+        // Always return the real quantity (can be zero or negative)
+        if ($totalQuantity > 0) {
+            return response()->json(['status' => true, 'message' => 'Stock found!', 'quantity' => $totalQuantity]);
+        } elseif ($totalQuantity == 0) {
+            return response()->json(['status' => false, 'message' => 'No stock available.', 'quantity' => 0]);
+        } else {
+            return response()->json(['status' => 'negative', 'message' => 'Stock is negative!', 'quantity' => $totalQuantity]);
         }
     }
 
     public function stockout(Request $request)
     {
         $data = $request->all();
-        $inventoryBalance = InventoryBalance::where('product_id',$data['product_id'])->where('lorry_id',$data['lorry_id'])->first();
-        if(!empty($inventoryBalance)){
-            if($inventoryBalance->quantity >= $data['quantity']){
-                $inventoryBalance->quantity = $inventoryBalance->quantity - $data['quantity'];
+        $lorryIds = is_array($data['lorry_id']) ? $data['lorry_id'] : [$data['lorry_id']];
+
+        foreach ($lorryIds as $lorryId) {
+            $inventoryBalance = InventoryBalance::where('product_id',$data['product_id'])->where('lorry_id',$lorryId)->first();
+            if (!empty($inventoryBalance)) {
+                $newQty = $inventoryBalance->quantity - $data['quantity'];
+                $inventoryBalance->quantity = $newQty;
                 $inventoryBalance->save();
-                $inventorytransaction = new InventoryTransaction();
-                $inventorytransaction->type = 2;
-                $inventorytransaction->lorry_id = $data['lorry_id'];
-                $inventorytransaction->product_id = $data['product_id'];
-                $inventorytransaction->quantity = $data['quantity'] * -1;
-                $inventorytransaction->date = date("Y-m-d H:i:s");
-                $inventorytransaction->user = Auth::user()->email . ' (' . Auth::user()->name . ')';
-                $inventorytransaction->save();
-                Flash::success('Inventory Balance had been updated successfully.');
-            }else{
-                Flash::error('Transfer quantity cannot more than inventory balance quantity.');
+            } else {
+                // No existing balance — create a negative record
+                $inventoryBalance = new InventoryBalance();
+                $inventoryBalance->lorry_id = $lorryId;
+                $inventoryBalance->product_id = $data['product_id'];
+                $inventoryBalance->quantity = 0 - $data['quantity'];
+                $inventoryBalance->save();
+                $newQty = $inventoryBalance->quantity;
             }
-        }else{
-            Flash::error('Inventory Balance not found.');
+
+            $inventorytransaction = new InventoryTransaction();
+            $inventorytransaction->type = 2;
+            $inventorytransaction->lorry_id = $lorryId;
+            $inventorytransaction->product_id = $data['product_id'];
+            $inventorytransaction->quantity = $data['quantity'] * -1;
+            $inventorytransaction->date = date("Y-m-d H:i:s");
+            $inventorytransaction->user = Auth::user()->email . ' (' . Auth::user()->name . ')';
+            $inventorytransaction->save();
+
+            if ($newQty < 0) {
+                Flash::warning('Stock Out recorded. Lorry ' . $lorryId . ' now has negative balance (' . $newQty . ').');
+            } else {
+                Flash::success('Inventory Balance updated successfully.');
+            }
         }
 
         return redirect(route('inventoryBalances.index'));

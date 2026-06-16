@@ -6,12 +6,13 @@ use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use App\Traits\BelongsToCompany;
 
 class Kelindan extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'kelindans';
 
@@ -68,9 +69,9 @@ class Kelindan extends Model
      * @var array
      */
     public static $rules = [
-        'employeeid' => 'required|string|max:20|unique:kelindans,employeeid',
+        'employeeid' => 'required|string|max:20',
         'name' => 'required|string|max:255',
-        'ic' => 'nullable|string|max:20|unique:kelindans,ic',
+        'ic' => 'nullable|string|max:20',
         'phone' => 'nullable|string|max:255',
         // 'commissionrate' => 'required|numeric|min:0|max:100',
         'bankdetails1' => 'nullable|string|max:255',

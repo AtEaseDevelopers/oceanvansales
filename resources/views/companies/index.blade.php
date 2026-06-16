@@ -13,7 +13,9 @@
                          <div class="card-header">
                              <i class="fa fa-align-justify"></i>
                              {{ __('companies.companies')}}
+                             @if(auth()->user()->is_super_admin)
                              <a class="pull-right" href="{{ route('companies.create') }}"><i class="fa fa-plus-square fa-lg"></i></a>
+                             @endif
                          </div>
                          <div class="card-body">
                              @include('companies.table')

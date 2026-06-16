@@ -3,35 +3,30 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use App\Models\Kelindan;
 use Illuminate\Support\Facades\Crypt;
 
 class UpdateKelindanRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
     public function rules()
     {
-        $id = $this->route('kelindan');
+        $id = Crypt::decrypt($this->route('kelindan'));
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $rules = [
-            'employeeid' => 'nullable|string|max:20|unique:kelindans,employeeid,'.Crypt::decrypt($id),
+            'employeeid' => ['nullable', 'string', 'max:20',
+                Rule::unique('kelindans', 'employeeid')->where('company_id', $companyId)->ignore($id),
+            ],
             'name' => 'required|string|max:255',
-            'ic' => 'nullable|string|max:20|unique:kelindans,ic,'.Crypt::decrypt($id),
+            'ic' => ['nullable', 'string', 'max:20',
+                Rule::unique('kelindans', 'ic')->where('company_id', $companyId)->ignore($id),
+            ],
             'phone' => 'nullable|string|max:255',
-            // 'commissionrate' => 'required|numeric|min:0|max:100',
             'bankdetails1' => 'nullable|string|max:255',
             'bankdetails2' => 'nullable|string|max:255',
             'firstvaccine' => 'nullable',
@@ -41,7 +36,7 @@ class UpdateKelindanRequest extends FormRequest
             'remark' => 'nullable|string|max:255',
             'created_at' => 'nullable',
             'updated_at' => 'nullable',
-            'deleted_at' => 'nullable'
+            'deleted_at' => 'nullable',
         ];
 
         return $rules;

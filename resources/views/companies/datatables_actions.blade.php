@@ -6,11 +6,13 @@
     <a href="{{ route('companies.edit', Crypt::encrypt($id)) }}" class='btn btn-ghost-info'>
        <i class="fa fa-edit"></i>
     </a>
+    @if(auth()->user()->is_super_admin)
     {!! Form::button('<i class="fa fa-trash"></i>', [
         'type' => 'submit',
         'class' => 'btn btn-ghost-danger',
-        'onclick' => "return confirm('".trans('companies.are_you_sure')."')"    
+        'onclick' => "return confirm('".trans('companies.are_you_sure')."')"
 
     ]) !!}
+    @endif
 </div>
 {!! Form::close() !!}

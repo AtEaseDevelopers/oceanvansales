@@ -3,51 +3,44 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use App\Models\Product;
 use Illuminate\Support\Facades\Crypt;
 use App\Services\EInvoiceService;
 
 class UpdateProductRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
-    
+
     protected $eInvoiceService;
-    
+
     public function __construct(EInvoiceService $eInvoiceService)
     {
         $this->eInvoiceService = $eInvoiceService;
     }
 
-
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
     public function rules()
     {
-        $id = $this->route('product');
+        $id = Crypt::decrypt($this->route('product'));
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $rules = [
-            'code' => 'required|string|max:255|unique:products,code,'.Crypt::decrypt($id),
-            'name' => 'required|string|max:255|string|max:255',
-            'price' => 'required|numeric|numeric',
+            'code' => ['required', 'string', 'max:255',
+                Rule::unique('products', 'code')->where('company_id', $companyId)->ignore($id),
+            ],
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric',
             'status' => 'required',
-            'created_at' => 'nullable|nullable',
-            'updated_at' => 'nullable|nullable'
+            'created_at' => 'nullable',
+            'updated_at' => 'nullable',
         ];
-        
+
         if ($this->eInvoiceService->isEnabled()) {
             $rules = array_merge($rules, $this->eInvoiceService->requiredProductFields());
         }
-        
+
         return $rules;
     }
 }

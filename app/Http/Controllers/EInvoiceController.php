@@ -8,6 +8,7 @@ use App\Models\Einvoice;
 use App\Models\ConsolidatedEinvoice;
 use App\Models\Invoice;
 use App\Services\MyInvoisService;
+use App\Traits\CalculatesCustomerCredit;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ use Flash;
 
 class EInvoiceController extends Controller
 {
+    use CalculatesCustomerCredit;
+
     protected $myInvoisService;
     protected $xmlGenerator;
 
@@ -706,21 +709,7 @@ class EInvoiceController extends Controller
                             }
                         }
                         
-                        try {
-                            $creditResult = DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');');
-                            if (!empty($creditResult) && isset($creditResult[0]->credit)) {
-                                $invoice->newcredit = round($creditResult[0]->credit, 2);
-                            } else {
-                                $invoice->newcredit = 0;
-                            }
-                        } catch (\Exception $e) {
-                            Log::warning('Failed to get customer credit for e-invoice PDF', [
-                                'invoice_id' => $invoice->id,
-                                'customer_id' => $invoice->customer_id,
-                                'error' => $e->getMessage(),
-                            ]);
-                            $invoice->newcredit = 0;
-                        }
+                        $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, $invoice->updated_at);
                     }
 
                     $qrCodeData = null;
@@ -1019,21 +1008,7 @@ class EInvoiceController extends Controller
                                 }
                             }
 
-                            try {
-                                $creditResult = DB::select('call ice_spGetCustomerCreditByDate("'.$invoice->updated_at.'",'.$invoice->customer_id.');');
-                                if (!empty($creditResult) && isset($creditResult[0]->credit)) {
-                                    $invoice->newcredit = round($creditResult[0]->credit, 2);
-                                } else {
-                                    $invoice->newcredit = 0;
-                                }
-                            } catch (\Exception $e) {
-                                Log::warning('Failed to get customer credit for consolidated e-invoice PDF', [
-                                    'invoice_id' => $invoice->id,
-                                    'customer_id' => $invoice->customer_id,
-                                    'error' => $e->getMessage(),
-                                ]);
-                                $invoice->newcredit = 0;
-                            }
+                            $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, $invoice->updated_at);
                         }
                     }
 

@@ -31,6 +31,12 @@ class Company extends Model
 
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
+
+    // Invoice number prefix per company. Add new companies here.
+    const INVOICE_PREFIXES = [
+        1 => 'OC',
+        2 => 'OS',
+    ];
     
 
     protected $dates = ['deleted_at'];
@@ -41,6 +47,10 @@ class Company extends Model
         'code',
         'name',
         'ssm',
+        'tin',
+        'phone1',
+        'phone2',
+        'phone3',
         'address1',
         'address2',
         'address3',
@@ -54,10 +64,14 @@ class Company extends Model
      * @var array
      */
     protected $casts = [
-        'id' => 'integer',
-        'code' => 'string',
-        'name' => 'string',
-        'ssm' => 'string',
+        'id'       => 'integer',
+        'code'     => 'string',
+        'name'     => 'string',
+        'ssm'      => 'string',
+        'tin'      => 'string',
+        'phone1'   => 'string',
+        'phone2'   => 'string',
+        'phone3'   => 'string',
         'address1' => 'string',
         'address2' => 'string',
         'address3' => 'string',
@@ -71,16 +85,18 @@ class Company extends Model
      * @var array
      */
     public static $rules = [
-        'code' => 'required|string|max:255|string|max:255',
-        'name' => 'required|string|max:255|string|max:255',
-        'ssm' => 'required|string|max:255|string|max:255',
-        'address1' => 'nullable|string|max:255|nullable|string|max:255',
-        'address2' => 'nullable|string|max:255|nullable|string|max:255',
-        'address3' => 'nullable|string|max:255|nullable|string|max:255',
-        'address4' => 'nullable|string|max:255|nullable|string|max:255',
-        'group_id' => 'required|unique:companies,group_id',
-        'created_at' => 'nullable|nullable',
-        'updated_at' => 'nullable|nullable'
+        'code'     => 'required|string|max:255',
+        'name'     => 'required|string|max:255',
+        'ssm'      => 'required|string|max:255',
+        'tin'      => 'nullable|string|max:50',
+        'phone1'   => 'nullable|string|max:20',
+        'phone2'   => 'nullable|string|max:20',
+        'phone3'   => 'nullable|string|max:20',
+        'address1' => 'nullable|string|max:255',
+        'address2' => 'nullable|string|max:255',
+        'address3' => 'nullable|string|max:255',
+        'address4' => 'nullable|string|max:255',
+    'group_id' => 'required|unique:companies,group_id',
     ];
 
     public function group()

@@ -5,6 +5,7 @@ namespace App\DataTables;
 use App\Models\Company;
 use Yajra\DataTables\Services\DataTable;
 use Yajra\DataTables\EloquentDataTable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CompanyDataTable extends DataTable
@@ -30,9 +31,15 @@ class CompanyDataTable extends DataTable
      */
     public function query(Company $model)
     {
-        return $model->newQuery()
-        ->with('group')
-        ->select('companies.*');
+        $query = $model->newQuery()
+            ->with('group')
+            ->select('companies.*');
+
+        if (!Auth::user()->is_super_admin) {
+            $query->where('id', Auth::user()->company_id);
+        }
+
+        return $query;
     }
 
     /**
@@ -52,11 +59,11 @@ class CompanyDataTable extends DataTable
             'stateDuration' => 0,
             'processing' => false,
             'buttons' => [
-                    [
+                    ...(Auth::user()->is_super_admin ? [[
                         'extend' => 'create',
                         'className' => 'btn btn-default btn-sm no-corner',
                         'text' => '<i class="fa fa-plus"></i> ' . trans('table_buttons.create'),
-                    ],
+                    ]] : []),
                     [
                         'extend' => 'print',
                         'className' => 'btn btn-default btn-sm no-corner',
@@ -152,14 +159,12 @@ class CompanyDataTable extends DataTable
             'code',
             'name',
             'ssm',
+            'tin',
             'address1',
             'address2',
             'address3',
             'address4',
 
-            'group_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Group',
-            'data' => 'group.description',
-            'name' => 'group.description'])
         ];
     }
 

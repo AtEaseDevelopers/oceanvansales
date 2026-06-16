@@ -6,12 +6,14 @@ use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use App\Traits\BelongsToCompany;
+use App\Models\Company;
 
 class Invoice extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'invoices';
 
@@ -20,6 +22,7 @@ class Invoice extends Model
 
     public const STATUS_SYNCED_TO_XERO = 1;
     public const STATUS_VOIDED = 2;
+
 
     public $fillable = [
         'invoiceno',
@@ -32,7 +35,8 @@ class Invoice extends Model
         'paymentterm',
         'status',
         'remark',
-        'chequeno'
+        'chequeno',
+        'trip_id',
     ];
 
     /**
@@ -43,15 +47,16 @@ class Invoice extends Model
     protected $casts = [
         'id' => 'integer',
         'invoiceno' => 'string',
-        'date' => 'datetime:d-m-Y H:i:s',
+        'date' => 'date:d-m-Y',
         'customer_id' => 'integer',
         'driver_id' => 'integer',
         'kelindan_id' => 'integer',
         'agent_id' => 'integer',
         'supervisor_id' => 'integer',
-        'paymentterm' => 'integer',
+        'paymentterm' => 'string',
         'status' => 'integer',
-        'remark' => 'string'
+        'remark' => 'string',
+        'trip_id' => 'integer',
     ];
 
     /**
@@ -115,9 +120,36 @@ class Invoice extends Model
         return $this->belongsToMany(\App\Models\ConsolidatedEinvoice::class, 'consolidated_einvoice_invoices', 'invoice_id', 'consolidated_einvoice_id');
     }
 
+    /**
+     * Generate the next invoice number for the current company and month.
+     * Format: {PREFIX}{YY}{MM}/{SEQUENCE} e.g. OS2606/00001
+     * Sequence is per-company per-month, auto-expands beyond 5 digits if needed.
+     */
+    public static function generateInvoiceNo(): string
+    {
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+        $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
+        $yy = date('y');
+        $mm = date('m');
+        $pattern = $prefix . $yy . $mm . '/%';
+
+        $lastInvoice = static::where('invoiceno', 'LIKE', $pattern)
+            ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/', invoiceno) + 1) AS UNSIGNED) DESC")
+            ->first();
+
+        $lastSeq = $lastInvoice
+            ? intval(substr($lastInvoice->invoiceno, strpos($lastInvoice->invoiceno, '/') + 1))
+            : 0;
+
+        $nextSeq = $lastSeq + 1;
+        $digits = max(5, strlen((string) $nextSeq));
+
+        return $prefix . $yy . $mm . '/' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
+    }
+
     public function getDateAttribute($value)
     {
-        return Carbon::parse($value)->format('d-m-Y H:i:s');
+        return Carbon::parse($value)->format('d-m-Y');
     }
 
 

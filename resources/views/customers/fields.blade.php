@@ -15,10 +15,7 @@
         <!-- Paymentterm Field -->
         <div class="form-group">
             {!! Form::label('paymentterm', __('customers.payment_term')) !!}:<span class="asterisk"> *</span>
-            {{ Form::select('paymentterm', [
-                1 => __('customers.payment_term_cash'),
-                2 => __('customers.payment_term_credit_note'),
-            ], null, ['class' => 'form-control']) }}
+            {{ Form::select('paymentterm', \App\Models\Customer::PAYMENT_TERMS, null, ['class' => 'form-control']) }}
         </div>
 
         <!-- Group Field -->
@@ -35,10 +32,10 @@
         </div>
 
         <!-- Supervisor Id Field -->
-        <div class="form-group">
+        <!-- <div class="form-group">
             {!! Form::label('supervisor_id', __('customers.operation')) !!}:
             {!! Form::select('supervisor_id', $supervisorItems, null, ['class' => 'form-control', 'placeholder' => 'Pick a Operation...']) !!}
-        </div>
+        </div> -->
 
         <!-- Phone Field -->
         <div class="form-group ">
@@ -50,6 +47,12 @@
         <div class="form-group ">
             {!! Form::label('address', __('customers.address')) !!}:
             {!! Form::text('address', null, ['class' => 'form-control', 'maxlength' => 65535]) !!} <!-- Removed duplicate maxlength -->
+        </div>
+
+        <!-- Address Location Field -->
+        <div class="form-group">
+            {!! Form::label('address_location', 'Location Link (Google Maps / Waze):') !!}:
+            {!! Form::text('address_location', null, ['class' => 'form-control', 'maxlength' => 2048, 'placeholder' => 'Paste Google Maps or Waze link here...']) !!}
         </div>
 
         <!-- Status Field -->

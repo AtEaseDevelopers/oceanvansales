@@ -25,6 +25,11 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        //
+        // Super admin bypasses ALL Gate/can/canany checks, including Blade @can directives
+        Gate::before(function ($user, $ability) {
+            if ($user->is_super_admin) {
+                return true;
+            }
+        });
     }
 }

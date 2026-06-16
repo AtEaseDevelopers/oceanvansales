@@ -1,3 +1,9 @@
+@php
+    $companyId = isset($invoice) && !empty($invoice->company_id)
+        ? $invoice->company_id
+        : (app()->bound('current_company_id') ? app('current_company_id') : 1);
+    $logoFile = ($companyId == 1) ? 'logo.png' : 'logo' . $companyId . '.png';
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -26,7 +32,7 @@
         }
 
         .login-image{
-            background-image: url('{{config('app.url')}}/logo.png');
+            background-image: url('{{config('app.url')}}/{{ $logoFile }}');
             width: auto;
             height: 55px;
             background-size: contain;
@@ -66,29 +72,51 @@
         </tr>
         <tr>
             <td>
-                <p class="company">AT EASE SOFTWARE SOLUTION SDN BHD</p>
+                <p class="company">{{ $company->name ?? '-' }}</p>
             </td>
         </tr>
+        @if(!empty($company->ssm))
         <tr>
             <td>
-                <p class="address">(1481747P)</p>
+                <p class="address">({{ $company->ssm }})</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->tin))
         <tr>
             <td>
-                <p class="address">Level 11, Menara KEN TTDI, 37, Jalan Burhanuddin Helmi</p>
+                <p class="address">({{ $company->tin }})</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->address1))
         <tr>
             <td>
-                <p class="address">Taman Tun Dr Ismail, 60000 Kuala Lumpur,</p>
+                <p class="address">{{ $company->address1 }}</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->address2))
         <tr>
             <td>
-                <p class="address">Wilayah Persekutuan Kuala Lumpur.</p>
+                <p class="address">{{ $company->address2 }}</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->address3))
+        <tr>
+            <td>
+                <p class="address">{{ $company->address3 }}</p>
+            </td>
+        </tr>
+        @endif
+        @if(!empty($company->address4))
+        <tr>
+            <td>
+                <p class="address">{{ $company->address4 }}</p>
+            </td>
+        </tr>
+        @endif
        
         <tr>
             <td>
@@ -107,7 +135,7 @@
                             <p>Invoice Date</p>
                         </td>
                         <td>
-                            <p class="ta-r">{{ date_format(date_create($invoice['date']),'d-m-Y H:i:s') ?? '-' }}</p>
+                            <p class="ta-r">{{ $invoice['date'] ?? '-' }}</p>
                         </td>
                     </tr>
                     <tr>
@@ -116,33 +144,10 @@
                         </td>
                         <td>
                             <p class="ta-r">
-                            @if($invoice['paymentterm']==1)
-                                {{ 'Cash' }}
-                            @elseif($invoice['paymentterm']==2)
-                                {{ 'Credit'}}
-                            @elseif($invoice['paymentterm']==3)
-                                {{ 'Online BankIn'}}
-                            @elseif($invoice['paymentterm']==4)
-                                {{ 'E-wallet'}}
-                            @elseif($invoice['paymentterm']==5)
-                                {{ 'Cheque'}}
-                            @endif
+                                {{ $invoice['paymentterm'] }}
                             </p>
                         </td>
                     </tr>
-                    
-                    @if($invoice['paymentterm']==5)
-                    <tr>
-                        <td>
-                            <p>Cheque No</p>
-                        </td>
-                        <td>
-                            <p class="ta-r">
-                            {{ $invoice['chequeno'] }}
-                            </p>
-                        </td>
-                    </tr>
-                    @endif
                     <tr>
                         <td>
                             <p>Address</p>

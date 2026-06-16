@@ -3,27 +3,24 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use App\Models\Lorry;
 
 class CreateLorryRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
     public function rules()
     {
-        return Lorry::$rules;
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+        $rules = Lorry::$rules;
+        $rules['lorryno'] = ['required', 'string', 'max:255',
+            Rule::unique('lorrys', 'lorryno')->where('company_id', $companyId),
+        ];
+
+        return $rules;
     }
 }

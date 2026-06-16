@@ -26,6 +26,10 @@ use Rap2hpoutre\FastExcel\FastExcel;
 */
 Route::view('/privacy-policy','privacy');
 
+Route::post('/company/switch', [\App\Http\Controllers\CompanySwitchController::class, 'switch'])
+    ->name('company.switch')
+    ->middleware('auth');
+
 // Route::get('/', function () {
 //     return view('welcome');
 // });
