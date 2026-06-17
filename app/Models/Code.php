@@ -41,6 +41,7 @@ class Code extends Model
         'description',
         'value',
         'sequence',
+        'company_id',
         'STR_UDF1',
         'STR_UDF2',
         'STR_UDF3',
@@ -56,6 +57,7 @@ class Code extends Model
      */
     protected $casts = [
         'id' => 'integer',
+        'company_id' => 'integer',
         'code' => 'string',
         'description' => 'string',
         'value' => 'string',

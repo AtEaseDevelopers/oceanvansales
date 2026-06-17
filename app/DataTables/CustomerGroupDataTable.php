@@ -29,7 +29,11 @@ class CustomerGroupDataTable extends DataTable
      */
     public function query(Code $model)
     {
-        return $model->newQuery()->where("code","=","customer_group");
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+
+        return $model->newQuery()
+            ->where('code', 'customer_group')
+            ->where('company_id', $companyId);
     }
 
     /**

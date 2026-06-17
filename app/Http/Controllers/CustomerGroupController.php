@@ -55,6 +55,7 @@ class CustomerGroupController extends AppBaseController
     {
         $input = $request->all();
         $input['value'] = rand(); //random number since it is not important if got code with same value then will occur error
+        $input['company_id'] = app()->bound('current_company_id') ? app('current_company_id') : null;
 
         $code = $this->codeRepository->create($input);
 
@@ -126,6 +127,7 @@ class CustomerGroupController extends AppBaseController
 
         $data = $request->all();
         $data['value'] = rand(); //random number since it is not important if got code with same value then will occur error
+        $data['company_id'] = app()->bound('current_company_id') ? app('current_company_id') : null;
 
         $code = $this->codeRepository->update($data, $id);
 
