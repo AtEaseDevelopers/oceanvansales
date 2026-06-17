@@ -222,6 +222,16 @@
         <span>{{ trans('side_menu.master_data') }}</span>
     </a>
 
+    @can('assign')
+        <ul class="nav-dropdown-items">
+            <li class="nav-item {{ Request::is('assigns*') ? 'active' : '' }}">
+                <a class="nav-link {{ Request::is('assigns*') ? 'active' : '' }}" href="{{ route('assigns.index') }}">
+                    <span>{{ trans('side_menu.assigns') }}</span>
+                </a>
+            </li>
+        </ul>
+    @endcan
+    
     @can('lorry')
         <ul class="nav-dropdown-items">
             <li class="nav-item {{ Request::is('lorries*') ? 'active' : '' }}">
@@ -331,16 +341,6 @@
             <li class="nav-item {{ Request::is('focs*') ? 'active' : '' }}">
                 <a class="nav-link {{ Request::is('focs*') ? 'active' : '' }}" href="{{ route('focs.index') }}">
                     <span>{{ trans('side_menu.focs') }}</span>
-                </a>
-            </li>
-        </ul>
-    @endcan
-
-    @can('assign')
-        <ul class="nav-dropdown-items">
-            <li class="nav-item {{ Request::is('assigns*') ? 'active' : '' }}">
-                <a class="nav-link {{ Request::is('assigns*') ? 'active' : '' }}" href="{{ route('assigns.index') }}">
-                    <span>{{ trans('side_menu.assigns') }}</span>
                 </a>
             </li>
         </ul>

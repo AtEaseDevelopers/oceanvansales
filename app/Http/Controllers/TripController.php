@@ -193,10 +193,67 @@ class TripController extends AppBaseController
         // Company info
         $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
 
+        // ── Stock Movement Table ───────────────────────────────────────────────
+        $lorryId       = $startTrip ? $startTrip->lorry_id : $endTrip->lorry_id;
+        $tripStartDate = $startTime ? $startTime->toDateTimeString() : null;
+        $tripEndDate   = $endTime->toDateTimeString();
+
+        $openingMap = collect($startTrip?->stock_snapshot ?? [])->keyBy('product_id');
+        $closingMap = collect($endTrip->stock_snapshot   ?? [])->keyBy('product_id');
+
+        $txBase = \App\Models\InventoryTransaction::where('lorry_id', $lorryId)
+            ->when($tripStartDate, fn($q) => $q->where('date', '>=', $tripStartDate))
+            ->where('date', '<=', $tripEndDate);
+
+        $adminInMap  = (clone $txBase)->where('type', 1)
+            ->selectRaw('product_id, SUM(quantity) as total')->groupBy('product_id')
+            ->pluck('total', 'product_id');
+
+        $adminOutMap = (clone $txBase)->where('type', 2)
+            ->selectRaw('product_id, SUM(ABS(quantity)) as total')->groupBy('product_id')
+            ->pluck('total', 'product_id');
+
+        $wastageMap  = (clone $txBase)->where('type', 5)
+            ->selectRaw('product_id, SUM(ABS(quantity)) as total')->groupBy('product_id')
+            ->pluck('total', 'product_id');
+
+        $salesMap = [];
+        foreach ($invoices as $invoice) {
+            foreach ($invoice->invoicedetail as $detail) {
+                if ($detail->totalprice > 0 && $detail->product_id) {
+                    $salesMap[$detail->product_id] = ($salesMap[$detail->product_id] ?? 0) + $detail->quantity;
+                }
+            }
+        }
+
+        $allProductIds = collect($openingMap->keys())
+            ->merge($closingMap->keys())
+            ->merge($adminInMap->keys())
+            ->merge($adminOutMap->keys())
+            ->merge($wastageMap->keys())
+            ->merge(array_keys($salesMap))
+            ->unique()->values();
+
+        $productNames = \App\Models\Product::whereIn('id', $allProductIds)->pluck('name', 'id');
+
+        $stockMovements = $allProductIds->map(function ($pid) use ($openingMap, $closingMap, $adminInMap, $adminOutMap, $wastageMap, $salesMap, $productNames) {
+            return [
+                'product_name'  => $openingMap[$pid]['product_name'] ?? $closingMap[$pid]['product_name'] ?? ($productNames[$pid] ?? '-'),
+                'opening_stock' => (int) ($openingMap[$pid]['quantity'] ?? 0),
+                'admin_in'      => (int) ($adminInMap[$pid] ?? 0),
+                'admin_out'     => (int) ($adminOutMap[$pid] ?? 0),
+                'sales_used'    => (int) ($salesMap[$pid] ?? 0),
+                'wastage'       => (int) ($wastageMap[$pid] ?? 0),
+                'closing_stock' => (int) ($closingMap[$pid]['quantity'] ?? 0),
+            ];
+        })->sortBy('product_name')->values();
+        // ──────────────────────────────────────────────────────────────────────
+
         $pdf = Pdf::loadView('trips.report', compact(
             'startTrip', 'endTrip', 'invoices',
             'breakdown', 'grandTotal', 'paymentLabels',
-            'startTime', 'endTime', 'duration', 'company'
+            'startTime', 'endTime', 'duration', 'company',
+            'stockMovements'
         ))->setPaper('a4', 'portrait');
 
         return $pdf->stream('daily-sales-report-' . $endTrip->id . '.pdf');

@@ -27,7 +27,8 @@ class Trip extends Model
         'kelindan_id',
         'lorry_id',
         'cash',
-        'type'
+        'type',
+        'stock_snapshot'
     ];
 
     /**
@@ -42,7 +43,8 @@ class Trip extends Model
         'kelindan_id' => 'integer',
         'lorry_id' => 'integer',
         'cash' => 'float',
-        'type' => 'integer'
+        'type' => 'integer',
+        'stock_snapshot' => 'array'
     ];
 
     /**

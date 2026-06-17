@@ -241,59 +241,41 @@ class AssignController extends AppBaseController
             $group_id = $data['group_id'];
             $driver_id = $data['driver_id'];
 
-            // Get all customers in the group
-            $customers = Customer::where('group', 'like', '%' . $group_id . '%')
+            // Get all customers in the group — use FIND_IN_SET for comma-separated group values
+            $customers = Customer::whereRaw('FIND_IN_SET(?, `group`)', [$group_id])
                 ->select('id', 'company')
                 ->get();
 
-            // Get existing assignments for this driver
-            $existingAssignments = Assign::where('driver_id', $driver_id)
-                ->whereIn('customer_id', $customers->pluck('id'))
+            // Build a simple id => sequence map from existing assignments for this driver
+            // Use toArray() to avoid keyBy/pluck collection key type issues
+            $assignmentMap = Assign::where('driver_id', $driver_id)
+                ->whereIn('customer_id', $customers->pluck('id')->toArray())
                 ->orderBy('sequence', 'asc')
-                ->get()
-                ->keyBy('customer_id');
+                ->pluck('sequence', 'customer_id')
+                ->toArray(); // [customer_id => sequence]
 
+            $maxSequence = count($assignmentMap) > 0 ? max($assignmentMap) : 0;
+            $autoSeq = $maxSequence;
+
+            // Build result for ALL customers in the group, assigned or not
             $result = [];
-
-            if ($existingAssignments->isNotEmpty()) {
-                // Use existing assignments with their sequences
-                foreach ($existingAssignments as $assignment) {
-                    $customer = $customers->firstWhere('id', $assignment->customer_id);
-                    if ($customer) {
-                        $result[] = [
-                            'id' => $customer->id,
-                            'company' => $customer->company,
-                            'sequence' => $assignment->sequence
-                        ];
-                    }
+            foreach ($customers as $customer) {
+                $id = (int) $customer->id;
+                if (isset($assignmentMap[$id])) {
+                    $sequence = (int) $assignmentMap[$id];
+                } else {
+                    $autoSeq++;
+                    $sequence = $autoSeq;
                 }
-                
-                // Add remaining customers (not yet assigned) with new sequences
-                $maxSequence = $existingAssignments->max('sequence') ?: 0;
-                $remainingCustomers = $customers->whereNotIn('id', $existingAssignments->pluck('customer_id'));
-                
-                foreach ($remainingCustomers as $index => $customer) {
-                    $result[] = [
-                        'id' => $customer->id,
-                        'company' => $customer->company,
-                        'sequence' => $maxSequence + $index + 1
-                    ];
-                }
-            } else {
-                // No existing assignments, just list all customers with default sequence
-                foreach ($customers as $index => $customer) {
-                    $result[] = [
-                        'id' => $customer->id,
-                        'company' => $customer->company,
-                        'sequence' => $index + 1
-                    ];
-                }
+                $result[] = [
+                    'id'       => $id,
+                    'company'  => $customer->company,
+                    'sequence' => $sequence,
+                ];
             }
 
-            // Sort by sequence
-            usort($result, function($a, $b) {
-                return $a['sequence'] - $b['sequence'];
-            });
+            // Sort by sequence so assigned customers appear in their saved order first
+            usort($result, fn($a, $b) => $a['sequence'] - $b['sequence']);
 
             if (empty($result)) {
                 return response()->json([

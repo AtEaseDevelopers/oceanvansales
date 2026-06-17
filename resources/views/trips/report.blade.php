@@ -31,6 +31,16 @@
     .summary-table tr:nth-child(even) td { background: #f9f9f9; }
     .summary-table .total-row td { font-weight: bold; background: #e8e8e8; border-top: 2px solid #333; }
 
+    /* Stock movement table */
+    .stock-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .stock-table th { background: #e8e8e8; color: #000; padding: 5px 6px; text-align: center; font-size: 10px; }
+    .stock-table th.col-product { text-align: left; }
+    .stock-table td { padding: 4px 6px; border: 1px solid #ddd; font-size: 10px; text-align: center; }
+    .stock-table td.col-product { text-align: left; }
+    .stock-table tr:nth-child(even) td { background: #f9f9f9; }
+    .stock-table .neg { color: #c0392b; }
+    .stock-table .pos { color: #27ae60; }
+
     /* Invoice table */
     .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
     .invoice-table th { background: #e8e8e8; color: #000000; padding: 5px 6px; text-align: left; font-size: 10px; }
@@ -117,6 +127,42 @@
             <td>TOTAL</td>
             <td class="text-right">{{ number_format($grandTotal, 2) }}</td>
         </tr>
+    </tbody>
+</table>
+
+{{-- Stock Movement --}}
+<div class="section-label mt-10">Stock Movement</div>
+<table class="stock-table">
+    <thead>
+        <tr>
+            <th class="col-product" style="width:28%">Product</th>
+            <th style="width:12%">Opening Stock</th>
+            <th style="width:10%">Admin In<br><span style="font-weight:normal;font-size:9px;">(Assigned)</span></th>
+            <th style="width:10%">Admin Out<br><span style="font-weight:normal;font-size:9px;">(Removed)</span></th>
+            <th style="width:12%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(Invoiced)</span></th>
+            <th style="width:10%">Wastage<br><span style="font-weight:normal;font-size:9px;">(Written Off)</span></th>
+            <th style="width:12%">Closing Stock</th>
+            <th style="width:6%">Variance</th>
+        </tr>
+    </thead>
+    <tbody>
+        @forelse($stockMovements as $row)
+        @php
+            $variance = $row['closing_stock'] - ($row['opening_stock'] + $row['admin_in'] - $row['admin_out'] - $row['sales_used'] - $row['wastage']);
+        @endphp
+        <tr>
+            <td class="col-product">{{ $row['product_name'] }}</td>
+            <td>{{ $row['opening_stock'] }}</td>
+            <td class="{{ $row['admin_in'] > 0 ? 'pos' : '' }}">{{ $row['admin_in'] > 0 ? '+' : '' }}{{ $row['admin_in'] }}</td>
+            <td class="{{ $row['admin_out'] > 0 ? 'neg' : '' }}">{{ $row['admin_out'] > 0 ? '-' : '' }}{{ $row['admin_out'] }}</td>
+            <td class="{{ $row['sales_used'] > 0 ? 'neg' : '' }}">{{ $row['sales_used'] > 0 ? '-' : '' }}{{ $row['sales_used'] }}</td>
+            <td class="{{ $row['wastage'] > 0 ? 'neg' : '' }}">{{ $row['wastage'] > 0 ? '-' : '' }}{{ $row['wastage'] }}</td>
+            <td style="font-weight:bold;">{{ $row['closing_stock'] }}</td>
+            <td class="{{ $variance != 0 ? 'neg' : '' }}">{{ $variance != 0 ? ($variance > 0 ? '+' : '') . $variance : '—' }}</td>
+        </tr>
+        @empty
+        <tr><td colspan="8" style="text-align:center;padding:10px;color:#999;">No stock snapshot available for this trip.</td></tr>
+        @endforelse
     </tbody>
 </table>
 

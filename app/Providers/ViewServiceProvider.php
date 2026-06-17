@@ -173,8 +173,12 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('driverItems', $driverItems);
         });
         View::composer(['assigns.massfields'], function ($view) {
-            $groups = Code::where('code','customer_group')->pluck('description','value')->toArray();
-            $view->with('groups', $groups);
+            $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+            $q = Code::where('code', 'customer_group');
+            if ($companyId && \Illuminate\Support\Facades\Schema::hasColumn('codes', 'company_id')) {
+                $q->where('company_id', $companyId);
+            }
+            $view->with('groups', $q->pluck('description', 'value')->toArray());
         });
         View::composer(['focs.fields'], function ($view) {
             $productItems = Product::pluck('name','id')->toArray();
@@ -205,8 +209,12 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('agentItems', $agentItems);
         });
         View::composer(['customers.fields'], function ($view) {
-            $groups = Code::where('code','customer_group')->pluck('description','value')->toArray();
-            $view->with('groups', $groups);
+            $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+            $q = Code::where('code', 'customer_group');
+            if ($companyId && \Illuminate\Support\Facades\Schema::hasColumn('codes', 'company_id')) {
+                $q->where('company_id', $companyId);
+            }
+            $view->with('groups', $q->pluck('description', 'value')->toArray());
         });
         View::composer(['customers.fields'], function ($view) {
             $countryOptions = \App\Models\CountryCode::orderBy('country')->get()->mapWithKeys(function ($country) {
@@ -220,8 +228,12 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('stateOptions', $stateOptions);
         });
         View::composer(['companies.fields'], function ($view) {
-            $groups = Code::where('code','customer_group')->pluck('description','value')->toArray();
-            $view->with('groups', $groups);
+            $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+            $q = Code::where('code', 'customer_group');
+            if ($companyId && \Illuminate\Support\Facades\Schema::hasColumn('codes', 'company_id')) {
+                $q->where('company_id', $companyId);
+            }
+            $view->with('groups', $q->pluck('description', 'value')->toArray());
         });
         View::composer(['drivers.fields'], function ($view) {
             $lorryItems = Lorry::orderBy("lorryno")->pluck('lorryno','id')->toArray();

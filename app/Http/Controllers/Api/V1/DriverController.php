@@ -407,6 +407,10 @@ class DriverController extends Controller
                     $newtrip->lorry_id = $data['lorry_id'];
                     $newtrip->type = 1;
                     $newtrip->date = date("Y-m-d H:i:s");
+                    $newtrip->stock_snapshot = InventoryBalance::where('lorry_id', $data['lorry_id'])
+                        ->with('product:id,name')->get()
+                        ->map(fn($b) => ['product_id' => $b->product_id, 'product_name' => $b->product?->name ?? '-', 'quantity' => $b->quantity])
+                        ->values()->toArray();
                     $newtrip->save();
                     Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
                     Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
@@ -457,6 +461,10 @@ class DriverController extends Controller
                 $newtrip->lorry_id = $data['lorry_id'];
                 $newtrip->type = 1;
                 $newtrip->date = date("Y-m-d H:i:s");
+                $newtrip->stock_snapshot = InventoryBalance::where('lorry_id', $data['lorry_id'])
+                    ->with('product:id,name')->get()
+                    ->map(fn($b) => ['product_id' => $b->product_id, 'product_name' => $b->product?->name ?? '-', 'quantity' => $b->quantity])
+                    ->values()->toArray();
                 $newtrip->save();
                 Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
                 Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
@@ -558,8 +566,8 @@ class DriverController extends Controller
                         'data' => null
                     ], 400);
                 }else{
-                    $newtrip = new Trip();  
-                    $newtrip->driver_id = $driver->id;   
+                    $newtrip = new Trip();
+                    $newtrip->driver_id = $driver->id;
                     $newtrip->kelindan_id = $data['kelindan_id'];
                     $newtrip->lorry_id = $data['lorry_id'];
                     $newtrip->cash = $data['cash'];
@@ -567,6 +575,7 @@ class DriverController extends Controller
                     $newtrip->type = 2;
                     $newtrip->date = date("Y-m-d H:i:s");
                     $newtrip->save();
+                    // Snapshot closing stock AFTER wastage deductions are applied below
                     Driver::where('id', $driver->id)->update(['trip_id' => null, 'lorry_id' => null]);
                     Lorry::where('id', $data['lorry_id'])->update(['status' => 1]);
                     //cancelled task
@@ -594,6 +603,12 @@ class DriverController extends Controller
                         $inventorytransaction->user = $driver->employeeid . " (" . $driver->name . ")";
                         $inventorytransaction->save();
                     }
+                    // Store closing stock snapshot after all wastage deductions
+                    $newtrip->stock_snapshot = InventoryBalance::where('lorry_id', $data['lorry_id'])
+                        ->with('product:id,name')->get()
+                        ->map(fn($b) => ['product_id' => $b->product_id, 'product_name' => $b->product?->name ?? '-', 'quantity' => $b->quantity])
+                        ->values()->toArray();
+                    $newtrip->save();
                     DB::commit();
                     return response()->json([
                         'result' => true,
