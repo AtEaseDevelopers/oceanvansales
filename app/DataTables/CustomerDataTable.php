@@ -76,10 +76,15 @@ class CustomerDataTable extends DataTable
             invoice_payments.customer_id
     ";
     
+            // Disable ONLY_FULL_GROUP_BY for this session — customers.* selects all columns
+            // and new columns (e.g. company_id, tourism_tax_registration) would otherwise
+            // require individual GROUP BY entries every time the table is altered.
+            DB::statement("SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''))");
+
             $query = $model->newQuery()
-    
+
                 ->with('agent:id,name')
-    
+
                 ->with('supervisor:id,name')
                 ->leftJoin(DB::raw("
                 (
@@ -122,23 +127,6 @@ class CustomerDataTable extends DataTable
     
                 ->groupBy(
                     'customers.id',
-                    'customers.code',
-                    'customers.company',
-                    'customers.company_id',
-                    'customers.paymentterm',
-                    'customers.phone',
-                    'customers.address',
-                    'customers.status',
-                    'customers.created_at',
-                    'customers.updated_at',
-                    'customers.deleted_at',
-                    'customers.supervisor_id',
-                    'customers.agent_id',
-                    'customers.group',
-                    'customers.tin',
-                    'customers.sst',
-                    'customers.customer_type',
-                    'customers.chinese_name',
                     'invoicesummary.customer_id',
                     'invoicesummary.totalprice',
                     'invoicesummary.paid',
