@@ -6,7 +6,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <title>Login | {{ 'Ocean Van Sales' }}</title>
-    <link rel="icon" type="image/png" href="{{config('app.url')}}/logo.png">
+    <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
     <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -353,7 +353,7 @@
     <div class="left-panel">
         <div class="iceberg"></div>
 
-        <img src="{{config('app.url')}}/logo.png" alt="{{ 'Ocean Van Sales' }}" class="left-logo">
+        <img src="{{ asset('logo.png') }}" alt="{{ 'Ocean Van Sales' }}" class="left-logo">
 
         <div class="left-company-name">{{ 'Ocean Van Sales' }}</div>
 
