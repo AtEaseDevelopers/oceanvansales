@@ -74,7 +74,7 @@
         }
         .dt-button.button-page-length.active{
             background-color: lightgray;
-        }
+    }
         .dataTables_wrapper .dataTables_paginate .paginate_button.active, .dataTables_wrapper .dataTables_paginate .paginate_button.active:hover{
             color: #333 !important;
             border: 1px solid rgba(0, 0, 0, 0.3);
@@ -397,9 +397,9 @@
         <span class="navbar-toggler-icon"></span>
     </button>
     <a class="navbar-brand" href="{{config('app.url')}}">
-        <img class="navbar-brand-full" src="{{config('app.url')}}/logo.png" height="30"
+        <img class="navbar-brand-full" src="{{ asset('logo.png') }}" height="30"
              alt="Multiline Logo">
-        <img class="navbar-brand-minimized" src="{{config('app.url')}}/logo.png" width="30"
+        <img class="navbar-brand-minimized" src="{{ asset('logo.png') }}" width="30"
              height="30" alt="Multiline Logo">
     </a>
     <button class="navbar-toggler sidebar-toggler d-md-down-none" type="button" data-toggle="sidebar-lg-show">
