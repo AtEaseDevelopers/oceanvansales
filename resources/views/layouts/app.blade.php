@@ -2,9 +2,9 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>{{config('app.name')}}</title>
+    <title>Ocean Van Sales</title>
     <meta content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no' name='viewport'>
-    <link rel="icon" type="image/x-icon" href="{{config('app.url')}}/favicon.ico">
+    <link rel="icon" type="image/png" href="{{config('app.url')}}/logo.png">
     <!-- Bootstrap 4.1.1 -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker.css">

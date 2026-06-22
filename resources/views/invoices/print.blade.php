@@ -1,9 +1,3 @@
-@php
-    $companyId = isset($invoice) && !empty($invoice->company_id)
-        ? $invoice->company_id
-        : (app()->bound('current_company_id') ? app('current_company_id') : 1);
-    $logoFile = ($companyId == 1) ? 'logo.png' : 'logo' . $companyId . '.png';
-@endphp
 <!DOCTYPE html>
 <html>
 <head>
@@ -32,7 +26,6 @@
         }
 
         .login-image{
-            background-image: url('{{config('app.url')}}/{{ $logoFile }}');
             width: auto;
             height: 55px;
             background-size: contain;
@@ -65,11 +58,7 @@
 </head>
 <body>
     <table class="invoice">
-        <tr>
-            <td>
-                <div class="login-image"></div>
-            </td>
-        </tr>
+      
         <tr>
             <td>
                 <p class="company">{{ $company->name ?? '-' }}</p>
