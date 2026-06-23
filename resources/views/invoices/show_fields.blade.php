@@ -67,7 +67,7 @@
 <div class="col-sm-4 text-center">
     <label>Attachment</label>
     <div>
-        <img src="{{ asset('storage/' . $invoice->attachment) }}" class="img-fluid img-thumbnail" style="max-height: 350px;">
+        <img src="{{ asset('/' . $invoice->attachment) }}" class="img-fluid img-thumbnail" style="max-height: 350px;">
     </div>
 </div>
 @endif
