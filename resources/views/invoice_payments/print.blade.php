@@ -67,11 +67,6 @@
     <table class="invoice">
         <tr>
             <td>
-                <div class="login-image"></div>
-            </td>
-        </tr>
-        <tr>
-            <td>
                 <p class="company">{{ $invoice['customer']['groupcompany']->name ?? config('invoice.name') }}</p>
             </td>
         </tr>

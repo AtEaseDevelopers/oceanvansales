@@ -1849,8 +1849,11 @@ class DriverController extends Controller
             ->select('companies.*')
             ->first() ?? null;
 
+            $company = $driver->company;
+
               $pdf = Pdf::loadView('invoices.print', array(
-                    'invoice' => $invoice
+                    'invoice' => $invoice,
+                    'company' => $company,
                 ));
     
             $pdf->setPaper(array(0, 0, 300, $height), 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
@@ -2121,8 +2124,11 @@ class DriverController extends Controller
             ->select('companies.*')
             ->first() ?? null;
 
+            $company = $driver->company;
+
             $pdf = Pdf::loadView('invoice_payments.print', array(
-                'invoice' => $invoice
+                'invoice' => $invoice,
+                'company' => $company,
             ));
 
     
