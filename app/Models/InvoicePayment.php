@@ -22,6 +22,7 @@ class InvoicePayment extends Model
 
 
     public $fillable = [
+        'docno',
         'invoice_id',
         'type',
         'customer_id',
