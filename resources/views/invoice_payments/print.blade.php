@@ -67,29 +67,51 @@
     <table class="invoice">
         <tr>
             <td>
-                <p class="company">{{ $invoice['customer']['groupcompany']->name ?? config('invoice.name') }}</p>
+                <p class="company">{{ $company->name ?? '-' }}</p>
             </td>
         </tr>
+        @if(!empty($company->ssm))
         <tr>
             <td>
-                <p class="address">{{ $invoice['customer']['groupcompany']->ssm ?? config('invoice.ssm') }}</p>
+                <p class="address">({{ $company->ssm }})</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->tin))
         <tr>
             <td>
-                <p class="address">{{ $invoice['customer']['groupcompany']->address1 ?? config('invoice.address1') }}</p>
+                <p class="address">({{ $company->tin }})</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->address1))
         <tr>
             <td>
-                <p class="address">{{ $invoice['customer']['groupcompany']->address2 ?? config('invoice.address2') }}</p>
+                <p class="address">{{ $company->address1 }}</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->address2))
         <tr>
             <td>
-                <p class="address">{{ $invoice['customer']['groupcompany']->address3 ?? env('INVOICE_ADDRESS3') }}</p>
+                <p class="address">{{ $company->address2 }}</p>
             </td>
         </tr>
+        @endif
+        @if(!empty($company->address3))
+        <tr>
+            <td>
+                <p class="address">{{ $company->address3 }}</p>
+            </td>
+        </tr>
+        @endif
+        @if(!empty($company->address4))
+        <tr>
+            <td>
+                <p class="address">{{ $company->address4 }}</p>
+            </td>
+        </tr>
+        @endif
         <tr>
             <td>
                 <p class="address">012-9147018/03-33413598</p>
