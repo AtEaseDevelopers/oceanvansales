@@ -24,7 +24,7 @@
 <!-- Type Field -->
 <div class="form-group col-sm-6">
     {!! Form::label('type', 'Type:') !!}<span class="asterisk"> *</span>
-    {{ Form::select('type', \App\Models\InvoicePayment::TYPES, null, ['class' => 'form-control']) }}
+    {{ Form::select('type', \App\Models\Customer::PAYMENT_TERMS, null, ['class' => 'form-control']) }}
 </div>
 
 <!-- Amount Field -->

@@ -18,7 +18,7 @@
                                 <strong>{{ __('invoices.create_invoice') }}</strong>
                             </div>
                             <div class="card-body">
-                                {!! Form::open(['route' => 'invoices.store']) !!}
+                                {!! Form::open(['route' => 'invoices.store', 'files' => true]) !!}
 
                                    @include('invoices.fields')
 

@@ -84,6 +84,18 @@
     {!! Form::text('remark', null, ['class' => 'form-control','maxlength' => 255,'maxlength' => 255]) !!}
 </div>
 
+<!-- Attachment Field -->
+<div class="form-group col-sm-6">
+    {!! Form::label('attachment', 'Attachment') !!}
+    <input type="file" name="attachment" class="form-control-file" accept="image/*">
+    @if(!empty($invoice->attachment))
+        <div class="mt-2">
+            <img src="{{ asset('storage/' . $invoice->attachment) }}" style="max-height: 100px;" class="img-thumbnail">
+            <small class="d-block text-muted">Current attachment</small>
+        </div>
+    @endif
+</div>
+
 <input type="text" class="d-none" name="method" id="method" value="2">
 
 <!-- Submit Field -->

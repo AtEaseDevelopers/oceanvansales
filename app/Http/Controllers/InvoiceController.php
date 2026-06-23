@@ -25,6 +25,7 @@ use App\Models\Code;
 use App\Traits\CalculatesCustomerCredit;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Storage;
 use Exception;
 
 class InvoiceController extends AppBaseController
@@ -77,6 +78,10 @@ class InvoiceController extends AppBaseController
         $input['date'] = date_create($input['date']);
         if($input['invoiceno'] == null){
             $input['invoiceno'] = Invoice::generateInvoiceNo();
+        }
+
+        if ($request->hasFile('attachment')) {
+            $input['attachment'] = $request->file('attachment')->store('invoices-attachments', 'public');
         }
 
         $invoice = $this->invoiceRepository->create($input);
@@ -188,6 +193,13 @@ class InvoiceController extends AppBaseController
         $input['date'] = date_create($input['date']);
         if($input['invoiceno'] == null){
             $input['invoiceno'] = Invoice::generateInvoiceNo();
+        }
+
+        if ($request->hasFile('attachment')) {
+            if ($invoice->attachment) {
+                Storage::disk('public')->delete($invoice->attachment);
+            }
+            $input['attachment'] = $request->file('attachment')->store('invoices-attachments', 'public');
         }
 
         $invoice = $this->invoiceRepository->update($input, $id);

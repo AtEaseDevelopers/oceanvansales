@@ -36,6 +36,7 @@ class Invoice extends Model
         'status',
         'remark',
         'chequeno',
+        'attachment',
         'trip_id',
     ];
 
@@ -56,6 +57,7 @@ class Invoice extends Model
         'paymentterm' => 'string',
         'status' => 'integer',
         'remark' => 'string',
+        'attachment' => 'string',
         'trip_id' => 'integer',
     ];
 

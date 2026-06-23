@@ -18,7 +18,7 @@
                               <strong>{{ __('invoices.edit_invoice') }}</strong>
                           </div>
                           <div class="card-body">
-                              {!! Form::model($invoice, ['route' => ['invoices.update', encrypt($invoice->id)], 'method' => 'patch']) !!}
+                              {!! Form::model($invoice, ['route' => ['invoices.update', encrypt($invoice->id)], 'method' => 'patch', 'files' => true]) !!}
 
                               @include('invoices.fields')
 

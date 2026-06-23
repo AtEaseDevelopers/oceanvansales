@@ -1,3 +1,6 @@
+<div class="row">
+<div class="{{ $invoice->attachment ? 'col-sm-8' : 'col-sm-12' }}">
+
 <!-- Invoiceno Field -->
 <div class="form-group">
     {!! Form::label('invoiceno', __('invoices.invoice_no')) !!}:<span class="asterisk"> *</span>
@@ -57,6 +60,19 @@
     {!! Form::label('remark', __('invoices.remark')) !!}:<span class="asterisk"> *</span>
     <p>{{ $invoice->remark }}</p>
 </div>
+
+</div>{{-- end left col --}}
+
+@if($invoice->attachment)
+<div class="col-sm-4 text-center">
+    <label>Attachment</label>
+    <div>
+        <img src="{{ asset('storage/' . $invoice->attachment) }}" class="img-fluid img-thumbnail" style="max-height: 350px;">
+    </div>
+</div>
+@endif
+
+</div>{{-- end row --}}
 
 @push('scripts')
     <script>
