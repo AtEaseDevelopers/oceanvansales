@@ -1873,7 +1873,8 @@ class DriverController extends Controller
      public function addpayment(Request $request){
         try{
             $data = $request->all();
-            //check session
+
+            // check session
             $driver = Driver::where('session', $request->header('session'))->first();
             if(empty($driver)){
                 return response()->json([
@@ -1883,15 +1884,16 @@ class DriverController extends Controller
                     'color_code' => ''
                 ], 401);
             }
-            //validation
-            
+
+            // validation — amount required only when invoices array is not provided
             $validator = Validator::make($request->all(), [
-                'date' => 'date_format:Y-m-d H:i:s',
+                'date'      => 'date_format:Y-m-d H:i:s',
                 'customer_id' => 'required|numeric',
-                'type' => 'required|numeric|gt:0|lt:6',
-                'remark' => 'present|nullable|string',
-                'amount' =>'required|numeric',
-                
+                'type'      => 'required|numeric|gt:0|lt:6',
+                'remark'    => 'present|nullable|string',
+                'amount'    => 'required_without:invoices|numeric',
+                'invoices'  => 'nullable|array|min:1',
+                'invoices.*'=> 'numeric',
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -1900,7 +1902,8 @@ class DriverController extends Controller
                     'data' => null,
                 ], 400);
             }
-            $customer = Customer::where('id',$data['customer_id'])->first();
+
+            $customer = Customer::where('id', $data['customer_id'])->first();
             if(empty($customer)){
                 return response()->json([
                     'result' => false,
@@ -1908,46 +1911,153 @@ class DriverController extends Controller
                     'data' => null,
                 ], 400);
             }
-            //process
-            
+
             DB::beginTransaction();
 
-            $invoicepayment = New InvoicePayment();
-            if(isset($data['invoice_id'])){
-                $linkedInvoice = Invoice::where('id', $data['invoice_id'])->first();
-                if(empty($linkedInvoice)){
-                    return response()->json([
-                        'result' => false,
-                        'message' => __LINE__.$this->message_separator.'api.message.invoice_not_found',
-                        'data' => null,
-                    ], 400);
-                }
-                $invoicepayment->invoice_id = $data['invoice_id'];
+            // generate docno from last payment record of the same company
+            $lastPayment = InvoicePayment::withoutGlobalScope('company')
+                ->where('company_id', $driver->company_id)
+                ->whereNotNull('docno')
+                ->orderBy('id', 'desc')
+                ->lockForUpdate()
+                ->first();
+
+            $lastNo = 0;
+            if($lastPayment && preg_match('/(\d+)$/', $lastPayment->docno, $m)){
+                $lastNo = (int) $m[1];
             }
-            
-            $invoicepayment->type = $data['type'];
-            $invoicepayment->customer_id = $data['customer_id'];
-            $invoicepayment->amount = $data['amount'];
-            $invoicepayment->status = 1;
-            $invoicepayment->chequeno = $data['cheque_no'] ?? null;
-            $invoicepayment->driver_id = $driver->id;
-            $invoicepayment->approve_by = $driver->name;
-            $invoicepayment->approve_at = date('Y-m-d H:i:s');
-            //$invoicepayment->created_at = $data['date'];
-            $invoicepayment->save();
-            
-            DB::commit();
-            $iv = InvoicePayment::where('id',$invoicepayment->id)->get()->first();
-           
-            $iv['payment_no'] = sprintf('PR%05d',$iv->id);
-            
-            
-            $iv->newcredit = $this->getCustomerCreditByDate($iv->customer_id, date('Y-m-d H:i:s'));
+            $docno = 'PR' . sprintf('%05d', $lastNo + 1);
+
+            $isMulti = !empty($data['invoices']) && is_array($data['invoices']);
+
+            if($isMulti){
+                // one InvoicePayment record per invoice, all sharing the same docno
+                $payments = [];
+                foreach($data['invoices'] as $invoice_id){
+                    $invoice = Invoice::with('invoicedetail')->where('id', $invoice_id)->first();
+                    if(empty($invoice)){
+                        DB::rollBack();
+                        return response()->json([
+                            'result' => false,
+                            'message' => __LINE__.$this->message_separator.'api.message.invoice_not_found',
+                            'data' => null,
+                        ], 400);
+                    }
+
+                    $invoicepayment = new InvoicePayment();
+                    $invoicepayment->docno       = $docno;
+                    $invoicepayment->invoice_id  = $invoice_id;
+                    $invoicepayment->type        = $data['type'];
+                    $invoicepayment->customer_id = $data['customer_id'];
+                    $invoicepayment->amount      = $invoice->invoicedetail->sum('totalprice');
+                    $invoicepayment->status      = 1;
+                    $invoicepayment->chequeno    = $data['cheque_no'] ?? null;
+                    $invoicepayment->remark      = $data['remark'] ?? null;
+                    $invoicepayment->driver_id   = $driver->id;
+                    $invoicepayment->approve_by  = $driver->name;
+                    $invoicepayment->approve_at  = date('Y-m-d H:i:s');
+                    $invoicepayment->save();
+
+                    $iv = InvoicePayment::find($invoicepayment->id);
+                    $iv['payment_no'] = $docno;
+                    $payments[] = $iv;
+                }
+
+                DB::commit();
+
+                $newcredit = $this->getCustomerCreditByDate($data['customer_id'], date('Y-m-d H:i:s'));
+                foreach($payments as $p){
+                    $p->newcredit = $newcredit;
+                }
+
+                return response()->json([
+                    'result' => true,
+                    'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                    'data' => $payments
+                ], 200);
+
+            } else {
+                // single payment (original behaviour)
+                $invoicepayment = new InvoicePayment();
+                $invoicepayment->docno = $docno;
+
+                if(isset($data['invoice_id'])){
+                    $linkedInvoice = Invoice::where('id', $data['invoice_id'])->first();
+                    if(empty($linkedInvoice)){
+                        DB::rollBack();
+                        return response()->json([
+                            'result' => false,
+                            'message' => __LINE__.$this->message_separator.'api.message.invoice_not_found',
+                            'data' => null,
+                        ], 400);
+                    }
+                    $invoicepayment->invoice_id = $data['invoice_id'];
+                }
+
+                $invoicepayment->type        = $data['type'];
+                $invoicepayment->customer_id = $data['customer_id'];
+                $invoicepayment->amount      = $data['amount'];
+                $invoicepayment->status      = 1;
+                $invoicepayment->chequeno    = $data['cheque_no'] ?? null;
+                $invoicepayment->remark      = $data['remark'] ?? null;
+                $invoicepayment->driver_id   = $driver->id;
+                $invoicepayment->approve_by  = $driver->name;
+                $invoicepayment->approve_at  = date('Y-m-d H:i:s');
+                $invoicepayment->save();
+
+                DB::commit();
+
+                $iv = InvoicePayment::find($invoicepayment->id);
+                $iv['payment_no'] = $docno;
+                $iv->newcredit = $this->getCustomerCreditByDate($iv->customer_id, date('Y-m-d H:i:s'));
+
+                return response()->json([
+                    'result' => true,
+                    'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                    'data' => $iv
+                ], 200);
+            }
+        }
+        catch(Exception $e){
+            DB::rollBack();
+            return response()->json([
+                'result' => false,
+                'message' => __LINE__.$this->message_separator.$e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
+
+    public function unpaidinvoice(Request $request, $customer_id = null){
+        try{
+            // check session
+            $driver = Driver::where('session', $request->header('session'))->first();
+            if(empty($driver)){
+                return response()->json([
+                    'result' => false,
+                    'message' => __LINE__.$this->message_separator.'api.message.invalid_session',
+                    'data' => null
+                ], 401);
+            }
+
+            $query = Invoice::doesntHave('invoicepayment')
+                ->with(['invoicedetail.product', 'customer'])
+                ->orderBy('date', 'desc');
+
+            if(!empty($customer_id)){
+                $query->where('customer_id', $customer_id);
+            }
+
+            $invoices = $query->get();
+
+            $invoices->each(function($invoice){
+                $invoice->totalamount = $invoice->invoicedetail->sum('totalprice');
+            });
 
             return response()->json([
                 'result' => true,
-                'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
-                'data' => $iv
+                'message' => __LINE__.$this->message_separator.'api.message.get_invoice_successfully',
+                'data' => $invoices
             ], 200);
         }
         catch(Exception $e){
@@ -1958,7 +2068,7 @@ class DriverController extends Controller
             ], 500);
         }
     }
-    
+
       public function paymentpdf(Request $request)
 	{
 	    try{

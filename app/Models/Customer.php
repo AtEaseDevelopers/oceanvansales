@@ -25,6 +25,7 @@ class Customer extends Model
         2 => 'Credit',
         3 => 'Online BankIn',
         4 => 'E-wallet',
+        5 => 'Cheque',
     ];
 
 

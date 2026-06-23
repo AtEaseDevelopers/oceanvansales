@@ -56,6 +56,7 @@ Route::group(['prefix' => 'v1'], function () {
      //Invoice Payment
     Route::post('/driver/invoicepayment', [App\Http\Controllers\Api\V1\DriverController::class, 'addpayment']);
     Route::post('/driver/invoicepayment/pdf', [App\Http\Controllers\Api\V1\DriverController::class, 'paymentpdf']);
+    Route::get('/driver/invoice/unpaid/{customer_id?}', [App\Http\Controllers\Api\V1\DriverController::class, 'unpaidinvoice']);
 
     //Stock
     Route::get('/driver/stock', [App\Http\Controllers\Api\V1\DriverController::class, 'getstock']);

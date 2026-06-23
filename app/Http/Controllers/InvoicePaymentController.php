@@ -90,17 +90,17 @@ class InvoicePaymentController extends AppBaseController
         }
 
         $input['user_id'] = Auth::user()->id;
-        $runningno = Code::where('code', 'prrunningnumber')->first();
-        if ($runningno == null) {
-            $runningno = Code::create([
-                'code' => 'prrunningnumber',
-                'description' => 'Payment running number',
-                'value' => 0,
-                'sequence' => 0
-            ]);
+        $lastPayment = InvoicePayment::withoutGlobalScope('company')
+            ->where('company_id', app('current_company_id'))
+            ->whereNotNull('docno')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $lastNo = 0;
+        if($lastPayment && preg_match('/(\d+)$/', $lastPayment->docno, $m)){
+            $lastNo = (int) $m[1];
         }
-        $runningno->increment('value');
-        $input['docno'] = 'PR' . sprintf('%05d', $runningno->value);
+        $input['docno'] = 'PR' . sprintf('%05d', $lastNo + 1);
 
         if (isset($input['invoice_id']) && is_array($input['invoice_id']) && count($input['invoice_id']) > 0) {
             foreach ($input['invoice_id'] as $invoice_id) {
