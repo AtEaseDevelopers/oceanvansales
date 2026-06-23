@@ -56,6 +56,7 @@ class Customer extends Model
         'sst_registration_no',
         'tourism_tax_registration',
         'address_location',
+        'waze_location',
     ];
 
     /**
@@ -77,6 +78,7 @@ class Customer extends Model
         'sst'              => 'string',
         'tin'              => 'string',
         'address_location' => 'string',
+        'waze_location'    => 'string',
     ];
 
     /**
@@ -94,6 +96,7 @@ class Customer extends Model
         'sst'              => 'nullable|string|max:255',
         'tin'              => 'nullable|string|max:255',
         'address_location' => 'nullable|string|max:2048',
+        'waze_location'    => 'nullable|string|max:2048',
     ];
 
     /**

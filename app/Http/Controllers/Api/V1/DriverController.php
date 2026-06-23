@@ -1051,6 +1051,8 @@ class DriverController extends Controller
                             ->where('companies.group_id',explode(',',$t['customer']['group'])[0])
                             ->select('companies.*')
                             ->first() ?? null;
+                        $task[$c]['customer']['google'] = $t['customer']['address_location'];
+                        $task[$c]['customer']['waze'] = $t['customer']['waze_location'];
                     }
                 }
             }else{
@@ -1334,6 +1336,11 @@ class DriverController extends Controller
             }
             //process
             $customer = DB::select("SELECT customers.*,COALESCE(b.credit,0) as credit FROM customers customers RIGHT JOIN ( SELECT customer_id FROM assigns assigns WHERE driver_id = ? UNION SELECT customer_id FROM invoices invoices WHERE driver_id = ? ) a on a.customer_id = customers.id LEFT JOIN ( select invoices.customer_id, sum(invoice_details.totalprice) as totalprice, COALESCE(paymentsummary.amount,0) as paid, ( sum(invoice_details.totalprice) - COALESCE(paymentsummary.amount,0) ) as credit from invoices left join invoice_details on invoices.id = invoice_details.invoice_id left join ( select invoice_payments.customer_id, sum(COALESCE(invoice_payments.amount,0)) as amount from invoice_payments where invoice_payments.status = 1 group by invoice_payments.customer_id ) as paymentsummary on invoices.customer_id = paymentsummary.customer_id where invoices.status = 1 group by invoices.customer_id, paymentsummary.customer_id, paymentsummary.amount ) b on b.customer_id = customers.id WHERE customers.company_id = ?", [$driver->id, $driver->id, $driver->company_id]);
+            $customer = array_map(function($c) {
+                $c->google = $c->address_location;
+                $c->waze = $c->waze_location;
+                return $c;
+            }, $customer);
             if(count($customer) != 0){
                 return response()->json([
                     'result' => true,

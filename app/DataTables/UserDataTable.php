@@ -39,10 +39,10 @@ class UserDataTable extends DataTable
                     $q->orWhere('users.company_id', $companyId);
                 }
             })
-            ->join('model_has_roles', function ($join) {
+            ->leftJoin('model_has_roles', function ($join) {
                 $join->on('users.id', '=', 'model_has_roles.model_id');
             })
-            ->join('roles', function ($join) {
+            ->leftJoin('roles', function ($join) {
                 $join->on('roles.id', '=', 'model_has_roles.role_id');
             })
             ->select(

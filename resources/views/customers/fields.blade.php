@@ -51,8 +51,14 @@
 
         <!-- Address Location Field -->
         <div class="form-group">
-            {!! Form::label('address_location', 'Location Link (Google Maps / Waze):') !!}:
-            {!! Form::text('address_location', null, ['class' => 'form-control', 'maxlength' => 2048, 'placeholder' => 'Paste Google Maps or Waze link here...']) !!}
+            {!! Form::label('address_location', 'Google Maps Link:') !!}:
+            {!! Form::text('address_location', null, ['class' => 'form-control', 'maxlength' => 2048, 'placeholder' => 'Paste Google Maps link here...']) !!}
+        </div>
+
+        <!-- Waze Location Field -->
+        <div class="form-group">
+            {!! Form::label('waze_location', 'Waze Link:') !!}:
+            {!! Form::text('waze_location', null, ['class' => 'form-control', 'maxlength' => 2048, 'placeholder' => 'Paste Waze link here...']) !!}
         </div>
 
         <!-- Status Field -->
