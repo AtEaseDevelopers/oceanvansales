@@ -126,7 +126,7 @@
                         </td>
                         <td>
                             <p class="ta-r">
-                                {{ \App\Models\InvoicePayment::TYPES[$invoice['type']] ?? $invoice['type'] }}
+                                {{ \App\Models\Customer::PAYMENT_TERMS[$invoice['type']] ?? $invoice['type'] }}
                             </p>
                         </td>
                     </tr>
