@@ -7,7 +7,7 @@
 <!-- Type Field -->
 <div class="form-group">
     {!! Form::label('type', __('invoice_payments.type')) !!}:
-    <p>{{ \App\Models\InvoicePayment::TYPES[$invoicePayment->type] ?? $invoicePayment->type }}</p>
+    <p>{{ \App\Models\Customer::PAYMENT_TERMS[$invoicePayment->type] ?? $invoicePayment->type }}</p>
 </div>
 
 <!-- Customer Id Field -->

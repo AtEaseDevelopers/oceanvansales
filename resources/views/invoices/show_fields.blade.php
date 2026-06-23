@@ -43,7 +43,7 @@
 <!-- Paymentterm Field -->
 <div class="form-group">
     {!! Form::label('paymentterm', __('invoices.payment_term')) !!}:<span class="asterisk"> *</span>
-    <p>{{ $invoice->paymentterm ?: 'Unknown' }}</p>
+    <p>{{ \App\Models\Customer::PAYMENT_TERMS[$invoice->paymentterm] ?? 'Unknown' }}</p>
 </div>
 
 <!-- Status Field -->
