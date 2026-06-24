@@ -67,12 +67,14 @@ class Product extends Model
     public static $rules = [
         'code' => 'required|string|max:255',
         'name' => 'required|string|max:255|string|max:255',
-        'price' => 'required|numeric|numeric',
+        'price' => 'nullable|numeric',
         'status' => 'required',
         'type' => 'required',
         'created_at' => 'nullable|nullable',
         'updated_at' => 'nullable|nullable'
     ];
-    
-    
+    public function prices()
+    {
+        return $this->hasMany(ProductPrice::class)->where('status', 1)->orderBy('id');
+    }
 }

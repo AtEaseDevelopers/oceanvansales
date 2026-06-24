@@ -930,7 +930,7 @@ class DriverController extends Controller
                     if(asset($t['customer']['id'])){
                         $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
-                        $task[$c]['customer']['product'] = DB::table('products')
+                        $products = DB::table('products')
                             ->leftJoin('special_prices', function($join) use($t)
                                 {
                                     $join->on('special_prices.customer_id','=',DB::raw("'".$t['customer']['id']."'"));
@@ -941,6 +941,7 @@ class DriverController extends Controller
                             ->where('products.company_id', $driver->company_id)
                             ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
                             ->get();
+                        $task[$c]['customer']['product'] = $this->appendProductPrices($products);
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
                             ->where('companies.group_id',explode(',',$t['customer']['group'])[0])
                             ->select('companies.*')
@@ -1036,7 +1037,7 @@ class DriverController extends Controller
                     if(asset($t['customer']['id'])){
                         $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
-                        $task[$c]['customer']['product'] = DB::table('products')
+                        $products = DB::table('products')
                             ->leftJoin('special_prices', function($join) use($t)
                                 {
                                     $join->on('special_prices.customer_id','=',DB::raw("'".$t['customer']['id']."'"));
@@ -1047,6 +1048,7 @@ class DriverController extends Controller
                             ->where('products.company_id', $driver->company_id)
                             ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
                             ->get();
+                        $task[$c]['customer']['product'] = $this->appendProductPrices($products);
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
                             ->where('companies.group_id',explode(',',$t['customer']['group'])[0])
                             ->select('companies.*')
@@ -1284,7 +1286,7 @@ class DriverController extends Controller
             }
             //process
             if(isset($data['customer_id'])){
-                $product = DB::table('products')
+                $products = DB::table('products')
                 ->leftJoin('special_prices', function($join) use($data)
                     {
                         $join->on('special_prices.customer_id','=',DB::raw("'".$data['customer_id']."'"));
@@ -1298,10 +1300,10 @@ class DriverController extends Controller
                 return response()->json([
                     'result' => true,
                     'message' => __LINE__.$this->message_separator.'api.message.product_found',
-                    'data' => $product
+                    'data' => $this->appendProductPrices($products)
                 ], 200);
             }else{
-                $product = DB::table('products')
+                $products = DB::table('products')
                 ->where('products.status','1')
                 ->where('products.company_id', $driver->company_id)
                 ->select('products.id','products.code','products.name',DB::raw('products.price as "price"'))
@@ -1309,7 +1311,7 @@ class DriverController extends Controller
                 return response()->json([
                     'result' => true,
                     'message' => __LINE__.$this->message_separator.'api.message.product_found',
-                    'data' => $product
+                    'data' => $this->appendProductPrices($products)
                 ], 200);
             }
         }
@@ -3873,5 +3875,31 @@ class DriverController extends Controller
 
         return \Blade::render($html, ['company' => $company]);
     }
-    
+
+    private function appendProductPrices($products)
+    {
+        $productIds = $products->pluck('id')->toArray();
+        if (empty($productIds)) {
+            return $products->map(function ($p) {
+                unset($p->price);
+                $p->prices = [];
+                return $p;
+            });
+        }
+        $allPrices = DB::table('product_prices')
+            ->whereIn('product_id', $productIds)
+            ->where('status', 1)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('product_id');
+
+        return $products->map(function ($p) use ($allPrices) {
+            unset($p->price);
+            $p->prices = isset($allPrices[$p->id])
+                ? $allPrices[$p->id]->pluck('price')->map(fn($v) => (float) $v)->values()->toArray()
+                : [];
+            return $p;
+        });
+    }
+
 }

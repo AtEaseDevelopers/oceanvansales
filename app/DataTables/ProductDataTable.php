@@ -18,7 +18,15 @@ class ProductDataTable extends DataTable
     {
         $dataTable = new EloquentDataTable($query);
 
-        return $dataTable->addColumn('action', 'products.datatables_actions');
+        return $dataTable
+            ->addColumn('action', 'products.datatables_actions')
+            ->addColumn('price', function (Product $product) {
+                if ($product->prices->count() > 0) {
+                    return $product->prices->map(fn($p) => 'RM ' . number_format($p->price, 2))->join(' / ');
+                }
+                return $product->price ? 'RM ' . number_format($product->price, 2) : '-';
+            })
+            ->rawColumns(['action']);
     }
 
     /**
@@ -29,7 +37,7 @@ class ProductDataTable extends DataTable
      */
     public function query(Product $model)
     {
-        return $model->newQuery();
+        return $model->newQuery()->with('prices');
     }
 
     /**
@@ -173,7 +181,13 @@ class ProductDataTable extends DataTable
 
             'code',
             'name',
-            'price',
+            'price' => new \Yajra\DataTables\Html\Column([
+                'title'      => 'Price',
+                'data'       => 'price',
+                'name'       => 'price',
+                'orderable'  => false,
+                'searchable' => false,
+            ]),
             'type',
             'status'
         ];

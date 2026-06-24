@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Http\Request;
 use App\Models\Product;
+use App\Models\ProductPrice;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Invoice;
@@ -86,6 +87,21 @@ class ProductController extends AppBaseController
         }
 
         $product = $this->productRepository->create($input);
+
+        $tiers = array_filter($input['price_tiers'] ?? [], fn($t) => isset($t['price']) && $t['price'] !== '');
+        foreach ($tiers as $tier) {
+            ProductPrice::create([
+                'product_id' => $product->id,
+                'company_id' => $product->company_id,
+                'price'      => $tier['price'],
+                'status'     => 1,
+            ]);
+        }
+        if (!empty($tiers)) {
+            $firstPrice = reset($tiers)['price'];
+            $product->price = $firstPrice;
+            $product->save();
+        }
 
         Flash::success($input['code'].__('products.saved_successfully'));
 
@@ -182,6 +198,22 @@ class ProductController extends AppBaseController
         }
 
         $product = $this->productRepository->update($input, $id);
+
+        ProductPrice::where('product_id', $product->id)->delete();
+        $tiers = array_filter($input['price_tiers'] ?? [], fn($t) => isset($t['price']) && $t['price'] !== '');
+        foreach ($tiers as $tier) {
+            ProductPrice::create([
+                'product_id' => $product->id,
+                'company_id' => $product->company_id,
+                'price'      => $tier['price'],
+                'status'     => 1,
+            ]);
+        }
+        if (!empty($tiers)) {
+            $firstPrice = reset($tiers)['price'];
+            $product->price = $firstPrice;
+            $product->save();
+        }
 
         Flash::success($product->code.__('products.updated_successfully'));
 
