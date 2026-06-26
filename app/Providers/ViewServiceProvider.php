@@ -424,7 +424,11 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('userItems', $userItems);
         });
         View::composer(['users.fields'], function ($view) {
-            $roleItems = Role::pluck('name','id')->toArray();
+            $query = Role::query();
+            if (!auth()->user()?->is_super_admin) {
+                $query->where('name', '!=', 'superadmin');
+            }
+            $roleItems = $query->pluck('name', 'id')->toArray();
             $view->with('roleItems', $roleItems);
         });
 

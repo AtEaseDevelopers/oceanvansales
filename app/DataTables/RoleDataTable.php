@@ -29,7 +29,13 @@ class RoleDataTable extends DataTable
      */
     public function query(Role $model)
     {
-        return $model->newQuery();
+        $query = $model->newQuery();
+
+        if (!auth()->user()?->is_super_admin) {
+            $query->where('name', '!=', 'superadmin');
+        }
+
+        return $query;
     }
 
     /**
