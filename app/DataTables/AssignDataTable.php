@@ -31,8 +31,8 @@ class AssignDataTable extends DataTable
     {
         return $model->newQuery()
         ->leftJoin('lorrys', 'lorrys.id', '=', 'assigns.lorry_id')
-        ->with('customer:id,company')
-        ->select('assigns.*', 'lorrys.lorryno');
+        ->leftJoin('customers', 'customers.id', '=', 'assigns.customer_id')
+        ->select('assigns.*', 'lorrys.lorryno', 'customers.company as customer_company');
     }
 
     /**
@@ -157,8 +157,8 @@ class AssignDataTable extends DataTable
             'name' => 'lorrys.lorryno']),
 
             'customer_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.customer'),
-            'data' => 'customer.company',
-            'name' => 'customer.company']),
+            'data' => 'customer_company',
+            'name' => 'customers.company']),
 
             'sequence'
 
