@@ -30,9 +30,9 @@ class AssignDataTable extends DataTable
     public function query(Assign $model)
     {
         return $model->newQuery()
-        ->with('driver:id,name')
+        ->leftJoin('lorrys', 'lorrys.id', '=', 'assigns.lorry_id')
         ->with('customer:id,company')
-        ->select('assigns.*');
+        ->select('assigns.*', 'lorrys.lorryno');
     }
 
     /**
