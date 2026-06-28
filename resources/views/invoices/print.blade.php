@@ -133,7 +133,7 @@
                         </td>
                         <td>
                             <p class="ta-r">
-                                {{ $invoice['paymentterm'] }}
+                                {{ \App\Models\Customer::PAYMENT_TERMS[$invoice['paymentterm']] ?? $invoice['paymentterm'] }}
                             </p>
                         </td>
                     </tr>

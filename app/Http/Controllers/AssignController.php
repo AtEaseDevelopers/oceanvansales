@@ -80,7 +80,7 @@ class AssignController extends AppBaseController
         
         foreach ($input['customer'] as $index => $customerId) {
             $data = [
-                'driver_id' => $input['driver_id'],
+                'lorry_id' => $input['lorry_id'],
                 'customer_id' => $customerId,
                 'sequence' => $input['sequence'][$index] ?? 1,
             ];
@@ -88,7 +88,7 @@ class AssignController extends AppBaseController
             // Check if assignment already exists using where()->first()
             $existingAssignment = $this->assignRepository
                 ->makeModel()
-                ->where('driver_id', $data['driver_id'])
+                ->where('lorry_id', $data['lorry_id'])
                 ->where('customer_id', $data['customer_id'])
                 ->first();
             
@@ -239,7 +239,7 @@ class AssignController extends AppBaseController
         try {
             $data = $request->all();
             $group_id = $data['group_id'];
-            $driver_id = $data['driver_id'];
+            $lorry_id = $data['lorry_id'];
 
             // Get all customers in the group — use FIND_IN_SET for comma-separated group values
             $customers = Customer::whereRaw('FIND_IN_SET(?, `group`)', [$group_id])
@@ -248,7 +248,7 @@ class AssignController extends AppBaseController
 
             // Build a simple id => sequence map from existing assignments for this driver
             // Use toArray() to avoid keyBy/pluck collection key type issues
-            $assignmentMap = Assign::where('driver_id', $driver_id)
+            $assignmentMap = Assign::where('lorry_id', $lorry_id)
                 ->whereIn('customer_id', $customers->pluck('id')->toArray())
                 ->orderBy('sequence', 'asc')
                 ->pluck('sequence', 'customer_id')

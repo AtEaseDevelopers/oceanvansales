@@ -169,8 +169,8 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('customerItems', $customerItems);
         });
         View::composer(['assigns.fields','drivers.assign','assigns.massfields'], function ($view) {
-            $driverItems = Driver::orderBy("name")->pluck('name','id')->toArray();
-            $view->with('driverItems', $driverItems);
+            $lorryItems = Lorry::orderBy("lorryno")->pluck('lorryno','id')->toArray();
+            $view->with('lorryItems', $lorryItems);
         });
         View::composer(['assigns.massfields'], function ($view) {
             $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;

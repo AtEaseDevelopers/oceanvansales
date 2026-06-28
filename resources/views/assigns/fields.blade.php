@@ -1,7 +1,7 @@
-<!-- Driver Id Field -->
+<!-- Lorry Id Field -->
 <div class="form-group col-sm-6">
-    {!! Form::label('driver_id', __('assign.driver')) !!}<span class="asterisk"> *</span>
-    {!! Form::select('driver_id', $driverItems, null, ['class' => 'form-control select2-driver', 'placeholder' => 'Pick a Driver...','autofocus']) !!}
+    {!! Form::label('lorry_id', __('assign.lorry')) !!}<span class="asterisk"> *</span>
+    {!! Form::select('lorry_id', $lorryItems, null, ['class' => 'form-control select2-lorry', 'placeholder' => 'Pick a Lorry...','autofocus']) !!}
 </div>
 
 <!-- Customer Id Field -->
@@ -30,36 +30,17 @@
             }
         });
         $(document).ready(function () {
-            // Initialize Select2 for customer field
             $('.select2-customer').select2({
                 placeholder: "Search for a customer...",
                 allowClear: true,
                 width: '100%'
             });
-            
-            // Initialize Select2 for driver field
-            $('.select2-driver').select2({
-                placeholder: "Search for a driver...",
+            $('.select2-lorry').select2({
+                placeholder: "Search for a lorry...",
                 allowClear: true,
                 width: '100%'
             });
-            
             HideLoad();
         });
     </script>
-
-    <style>
-        /* Optional: Style the Select2 dropdowns to match your theme */
-        .select2-container--default .select2-selection--single {
-            border: 1px solid #ced4da;
-            border-radius: .25rem;
-            height: 38px;
-        }
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            line-height: 36px;
-        }
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            height: 36px;
-        }
-    </style>
 @endpush

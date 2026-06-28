@@ -152,9 +152,9 @@ class AssignDataTable extends DataTable
             'orderable' => false,
             'searchable' => false]),
 
-            'driver_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.driver'),
-            'data' => 'driver.name',
-            'name' => 'driver.name']),
+            'lorry_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.lorry'),
+            'data' => 'lorry.lorryno',
+            'name' => 'lorry.lorryno']),
 
             'customer_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.customer'),
             'data' => 'customer.company',

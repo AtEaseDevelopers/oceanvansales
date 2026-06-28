@@ -415,7 +415,7 @@ class DriverController extends Controller
                     Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
                     Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
                     //generate task
-                    $assigns = Assign::where('driver_id', $driver->id)->orderby('sequence','asc')->get()->toarray();
+                    $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
                     $count = 1;
                     foreach($assigns as $assign){
                         $task = new Task();
@@ -469,7 +469,7 @@ class DriverController extends Controller
                 Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
                 Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
                 //generate task
-                $assigns = Assign::where('driver_id', $driver->id)->orderby('sequence','asc')->get()->toarray();
+                $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
                 $count = 1;
                 foreach($assigns as $assign){
                     $task = new Task();
@@ -695,7 +695,7 @@ class DriverController extends Controller
                     $newtrip->date = date("Y-m-d H:i:s");
                     $newtrip->save();
                     //generate task
-                    $assigns = Assign::where('driver_id', $driver->id)->orderby('sequence','asc')->get()->toarray();
+                    $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
                     $count = 1;
                     foreach($assigns as $assign){
                         $task = new Task();
@@ -741,7 +741,7 @@ class DriverController extends Controller
                 $newtrip->date = date("Y-m-d H:i:s");
                 $newtrip->save();
                 //generate task
-                $assigns = Assign::where('driver_id', $driver->id)->orderby('sequence','asc')->get()->toarray();
+                $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
                 $count = 1;
                 foreach($assigns as $assign){
                     $task = new Task();
@@ -1337,7 +1337,7 @@ class DriverController extends Controller
                 ], 401);
             }
             //process
-            $customer = DB::select("SELECT customers.*,COALESCE(b.credit,0) as credit FROM customers customers RIGHT JOIN ( SELECT customer_id FROM assigns assigns WHERE driver_id = ? UNION SELECT customer_id FROM invoices invoices WHERE driver_id = ? ) a on a.customer_id = customers.id LEFT JOIN ( select invoices.customer_id, sum(invoice_details.totalprice) as totalprice, COALESCE(paymentsummary.amount,0) as paid, ( sum(invoice_details.totalprice) - COALESCE(paymentsummary.amount,0) ) as credit from invoices left join invoice_details on invoices.id = invoice_details.invoice_id left join ( select invoice_payments.customer_id, sum(COALESCE(invoice_payments.amount,0)) as amount from invoice_payments where invoice_payments.status = 1 group by invoice_payments.customer_id ) as paymentsummary on invoices.customer_id = paymentsummary.customer_id where invoices.status = 1 group by invoices.customer_id, paymentsummary.customer_id, paymentsummary.amount ) b on b.customer_id = customers.id WHERE customers.company_id = ?", [$driver->id, $driver->id, $driver->company_id]);
+            $customer = DB::select("SELECT customers.*,COALESCE(b.credit,0) as credit FROM customers customers RIGHT JOIN ( SELECT customer_id FROM assigns assigns WHERE lorry_id = ? UNION SELECT customer_id FROM invoices invoices WHERE driver_id = ? ) a on a.customer_id = customers.id LEFT JOIN ( select invoices.customer_id, sum(invoice_details.totalprice) as totalprice, COALESCE(paymentsummary.amount,0) as paid, ( sum(invoice_details.totalprice) - COALESCE(paymentsummary.amount,0) ) as credit from invoices left join invoice_details on invoices.id = invoice_details.invoice_id left join ( select invoice_payments.customer_id, sum(COALESCE(invoice_payments.amount,0)) as amount from invoice_payments where invoice_payments.status = 1 group by invoice_payments.customer_id ) as paymentsummary on invoices.customer_id = paymentsummary.customer_id where invoices.status = 1 group by invoices.customer_id, paymentsummary.customer_id, paymentsummary.amount ) b on b.customer_id = customers.id WHERE customers.company_id = ?", [$driver->lorry_id, $driver->id, $driver->company_id]);
             $customer = array_map(function($c) {
                 $c->google = $c->address_location;
                 $c->waze = $c->waze_location;
@@ -1803,7 +1803,229 @@ class DriverController extends Controller
             ], 500);
         }
     }
-    
+
+    public function bulkCreateInvoice(Request $request)
+    {
+        $driver = Driver::where('session', $request->header('session'))->first();
+        if (empty($driver)) {
+            return response()->json([
+                'result'  => false,
+                'message' => __LINE__ . $this->message_separator . 'api.message.invalid_session',
+                'data'    => null
+            ], 401);
+        }
+
+        $trip = Trip::where('driver_id', $driver->id)->orderby('date', 'desc')->first();
+        if (empty($trip) || $trip->type == 2) {
+            return response()->json([
+                'result'  => false,
+                'message' => __LINE__ . $this->message_separator . 'api.message.trip_had_not_started',
+                'data'    => null
+            ], 401);
+        }
+
+        $invoicesInput = $request->input('invoices', []);
+
+        if (empty($invoicesInput) || !is_array($invoicesInput)) {
+            return response()->json([
+                'result'  => false,
+                'message' => __LINE__ . $this->message_separator . 'invoices field is required and must be an array',
+                'data'    => null
+            ], 400);
+        }
+
+        $results = [];
+
+        foreach ($invoicesInput as $index => $invoiceInput) {
+            try {
+                $validator = Validator::make($invoiceInput, [
+                    'date'                               => 'date_format:Y-m-d H:i:s',
+                    'customer_id'                        => 'required|numeric',
+                    'type'                               => 'required|numeric|gt:0|lt:6',
+                    'remark'                             => 'present|nullable|string',
+                    'invoiceno'                          => 'present|nullable|string',
+                    'invoicedetail'                      => 'required|array|min:1',
+                    'invoicedetail.*.product_id'         => 'required|numeric',
+                    'invoicedetail.*.quantity'           => 'required|numeric|min:1',
+                    'invoicedetail.*.price'              => 'required|numeric|min:0',
+                    'invoicedetail.*.foc'                => 'required|boolean',
+                ]);
+
+                if ($validator->fails()) {
+                    $results[] = [
+                        'index'   => $index,
+                        'success' => false,
+                        'errors'  => $validator->errors()->toArray(),
+                        'input'   => $invoiceInput,
+                    ];
+                    continue;
+                }
+
+                $customer = Customer::where('id', $invoiceInput['customer_id'])->first();
+                if (empty($customer)) {
+                    $results[] = [
+                        'index'   => $index,
+                        'success' => false,
+                        'error'   => 'api.message.invalid_customer',
+                        'input'   => $invoiceInput,
+                    ];
+                    continue;
+                }
+
+                DB::beginTransaction();
+
+                $invoiceno = !empty($invoiceInput['invoiceno']) ? $invoiceInput['invoiceno'] : Invoice::generateInvoiceNo();
+
+                if (Invoice::where('invoiceno', $invoiceno)->exists()) {
+                    $invoiceno = Invoice::generateInvoiceNo();
+                }
+
+                $invoice               = new Invoice();
+                $invoice->date         = $invoiceInput['date'] ?? date('Y-m-d H:i:s');
+                $invoice->invoiceno    = $invoiceno;
+                $invoice->customer_id  = $customer->id;
+                $invoice->driver_id    = $trip->driver_id;
+                $invoice->kelindan_id  = $trip->kelindan_id;
+                $invoice->agent_id     = $customer->agent_id;
+                $invoice->supervisor_id = $customer->supervisor_id;
+                $invoice->paymentterm  = $invoiceInput['type'];
+                $invoice->status       = 1;
+                $invoice->chequeno     = $invoiceInput['cheque_no'] ?? null;
+                $invoice->remark       = $invoiceInput['remark'] ?? null;
+                $invoice->trip_id      = $driver->trip_id;
+                $invoice->save();
+
+                $totalprice = 0;
+
+                foreach ($invoiceInput['invoicedetail'] as $item) {
+                    $product = Product::where('id', $item['product_id'])->first();
+                    if (empty($product)) {
+                        DB::rollBack();
+                        $results[] = [
+                            'index'   => $index,
+                            'success' => false,
+                            'error'   => 'api.message.invalid_product',
+                            'input'   => $invoiceInput,
+                        ];
+                        continue 2;
+                    }
+
+                    $invoicedetail             = new InvoiceDetail();
+                    $invoicedetail->invoice_id = $invoice->id;
+                    $invoicedetail->product_id = $item['product_id'];
+                    $invoicedetail->quantity   = $item['quantity'];
+                    $invoicedetail->price      = $item['price'];
+                    $invoicedetail->totalprice = $item['quantity'] * $item['price'];
+                    $totalprice               += $invoicedetail->totalprice;
+
+                    if ($item['foc']) {
+                        $invoicedetail->remark = 'FOC';
+                    } else {
+                        $foc = Foc::where('customer_id', $customer->id)
+                            ->where('product_id', $item['product_id'])
+                            ->where('startdate', '<=', date('Y-m-d H:i:s'))
+                            ->where('enddate', '>', date('Y-m-d H:i:s'))
+                            ->where('status', 1)
+                            ->first();
+
+                        if ($foc) {
+                            $newAchieveQuantity = $foc->achievequantity + $item['quantity'];
+                            $foc->update([
+                                'achievequantity' => $newAchieveQuantity,
+                                'status'          => ($newAchieveQuantity >= $foc->quantity) ? 0 : 1,
+                            ]);
+                        }
+                    }
+
+                    $invoicedetail->save();
+
+                    $inventorybalance = InventoryBalance::where('lorry_id', $trip->lorry_id)
+                        ->where('product_id', $item['product_id'])->first();
+                    if (empty($inventorybalance)) {
+                        $newinventorybalance             = new InventoryBalance();
+                        $newinventorybalance->lorry_id   = $trip->lorry_id;
+                        $newinventorybalance->product_id = $item['product_id'];
+                        $newinventorybalance->quantity   = 0 - $item['quantity'];
+                        $newinventorybalance->save();
+                    } else {
+                        $inventorybalance->quantity -= $item['quantity'];
+                        $inventorybalance->save();
+                    }
+
+                    $inventorytransaction             = new InventoryTransaction();
+                    $inventorytransaction->lorry_id   = $trip->lorry_id;
+                    $inventorytransaction->product_id = $item['product_id'];
+                    $inventorytransaction->quantity   = $item['quantity'] * -1;
+                    $inventorytransaction->type       = 3;
+                    $inventorytransaction->user       = $driver->employeeid . ' (' . $driver->name . ')';
+                    $inventorytransaction->date       = date('Y-m-d H:i:s');
+                    $inventorytransaction->save();
+                }
+
+                if ($invoiceInput['type'] == 1) {
+                    $invoicepayment             = new InvoicePayment();
+                    $invoicepayment->invoice_id = $invoice->id;
+                    $invoicepayment->type       = $invoiceInput['type'];
+                    $invoicepayment->customer_id = $invoice->customer_id;
+                    $invoicepayment->amount     = $totalprice;
+                    $invoicepayment->status     = 1;
+                    $invoicepayment->driver_id  = $driver->id;
+                    $invoicepayment->approve_by = $driver->name;
+                    $invoicepayment->approve_at = date('Y-m-d H:i:s');
+                    $invoicepayment->save();
+                }
+
+                Task::where('customer_id', $customer->id)
+                    ->where('driver_id', $driver->id)
+                    ->update(['status' => 8]);
+
+                DB::commit();
+
+                $iv = Invoice::where('id', $invoice->id)->with('invoicedetail.product')->first();
+                $iv->newcredit = $this->getCustomerCreditByDate($iv->customer_id, date('Y-m-d H:i:s'));
+
+                $results[] = [
+                    'index'           => $index,
+                    'success'         => true,
+                    'invoiceno'       => $invoice->invoiceno,
+                    'invoice_id'      => $invoice->id,
+                    'date'            => $invoice->date,
+                    'customer_id'     => $invoice->customer_id,
+                    'customer_name'   => $customer->company,
+                    'total'           => $totalprice,
+                    'paymentterm'     => $invoice->paymentterm,
+                    'status'          => $invoice->status,
+                    'payment_created' => $invoiceInput['type'] == 1,
+                    'items_count'     => count($invoiceInput['invoicedetail']),
+                    'data'            => $iv,
+                ];
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                $results[] = [
+                    'index'   => $index,
+                    'success' => false,
+                    'error'   => $e->getMessage(),
+                    'input'   => $invoiceInput,
+                ];
+            }
+        }
+
+        $successCount = collect($results)->where('success', true)->count();
+        $failCount    = collect($results)->where('success', false)->count();
+
+        return response()->json([
+            'result'  => true,
+            'message' => __LINE__ . $this->message_separator . "Bulk create completed: {$successCount} succeeded, {$failCount} failed",
+            'data'    => [
+                'total_submitted' => count($invoicesInput),
+                'success_count'   => $successCount,
+                'fail_count'      => $failCount,
+                'results'         => $results,
+            ]
+        ], 200);
+    }
+
       public function invoicepdf(Request $request)
 	{
 	    try{
@@ -2845,7 +3067,7 @@ class DriverController extends Controller
         if(!empty($fromdrivertrip)){
             if($fromdrivertrip->type == 2){
                 //Take from assign & invoice
-                $assigns = Assign::where('driver_id', $fromdriver->id)
+                $assigns = Assign::where('lorry_id', $fromdrivertrip->lorry_id)
                 ->orderby('sequence','asc')
                 ->select('customer_id','sequence',DB::RAW('0 as invoice_id'));
                 $task = Invoice::where('driver_id', $fromdriver->id)
@@ -2875,7 +3097,7 @@ class DriverController extends Controller
             }
         }else{
             //Take from assign & invoice
-            $assigns = Assign::where('driver_id', $fromdriver->id)
+            $assigns = Assign::where('lorry_id', $fromdriver->lorry_id)
             ->orderby('sequence','asc')
             ->select('customer_id','sequence',DB::RAW('0 as invoice_id'));
             $task = Invoice::where('driver_id', $fromdriver->id)
@@ -3387,8 +3609,8 @@ class DriverController extends Controller
                 $productSold[] = ['name' => $name, 'quantity' => $qty];
             }
 
-            // FOC: only for customers assigned to this driver
-            $assignedCustomerIds = Assign::where('driver_id', $driver->id)->pluck('customer_id');
+            // FOC: only for customers assigned to this lorry
+            $assignedCustomerIds = Assign::where('lorry_id', $driver->lorry_id)->pluck('customer_id');
             $productFoc = foc::whereIn('customer_id', $assignedCustomerIds)
                 ->where('status', 1)
                 ->where('startdate', '<=', date('Y-m-d H:i:s'))
