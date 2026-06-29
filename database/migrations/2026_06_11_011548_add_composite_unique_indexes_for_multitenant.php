@@ -13,11 +13,6 @@ class AddCompositeUniqueIndexesForMultitenant extends Migration
      */
     public function up()
     {
-        // customers: code unique per company
-        Schema::table('customers', function (Blueprint $table) {
-            $table->unique(['code', 'company_id'], 'customers_code_company_unique');
-        });
-
         // drivers: employeeid and ic unique per company
         Schema::table('drivers', function (Blueprint $table) {
             $table->unique(['employeeid', 'company_id'], 'drivers_employeeid_company_unique');
@@ -60,10 +55,6 @@ class AddCompositeUniqueIndexesForMultitenant extends Migration
 
     public function down()
     {
-        Schema::table('customers', function (Blueprint $table) {
-            $table->dropUnique('customers_code_company_unique');
-        });
-
         Schema::table('drivers', function (Blueprint $table) {
             $table->dropUnique('drivers_employeeid_company_unique');
             $table->dropUnique('drivers_ic_company_unique');
