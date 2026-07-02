@@ -63,6 +63,13 @@ class AutocountSyncTest extends TestCase
             $table->string('code')->nullable();
             $table->string('name')->nullable();
         });
+
+        // Each company is a branch, mapped to one AutoCount account book via its code.
+        Schema::create('companies', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('code')->nullable();
+            $table->string('name')->nullable();
+        });
     }
 
     protected function tearDown(): void
@@ -71,7 +78,13 @@ class AutocountSyncTest extends TestCase
         Schema::dropIfExists('invoices');
         Schema::dropIfExists('customers');
         Schema::dropIfExists('products');
+        Schema::dropIfExists('companies');
         parent::tearDown();
+    }
+
+    private function makeCompany(int $id, string $code): void
+    {
+        DB::table('companies')->insert(['id' => $id, 'code' => $code, 'name' => $code . ' Branch']);
     }
 
     private function makeInvoice(array $overrides = []): int
@@ -125,18 +138,19 @@ class AutocountSyncTest extends TestCase
     /** @test */
     public function queued_endpoint_returns_queued_invoices_with_details()
     {
+        $this->makeCompany(1, 'OC');
         DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd', 'paymentterm' => '1']);
         DB::table('products')->insert(['id' => 1, 'code' => 'P001', 'name' => 'Widget']);
 
-        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => '2']);
-        $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_NOT_SYNCED]); // must be excluded
+        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => '2', 'company_id' => 1]);
+        $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_NOT_SYNCED, 'company_id' => 1]); // must be excluded
 
         DB::table('invoice_details')->insert([
             'invoice_id' => $queued, 'product_id' => 1, 'quantity' => 3, 'price' => 10.50,
             'remark' => 'Line remark', 'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $response = $this->getJson('/api/autocount/invoices/queued');
+        $response = $this->getJson('/api/autocount/invoices/queued?book=OC');
 
         $response->assertStatus(200)
             ->assertJsonCount(1)
@@ -150,15 +164,56 @@ class AutocountSyncTest extends TestCase
     /** @test */
     public function queued_endpoint_falls_back_to_customer_payment_term()
     {
+        $this->makeCompany(1, 'OC');
         DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd', 'paymentterm' => '2']);
 
         // Invoice has no payment term of its own; the customer's should be used.
-        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => null]);
+        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => null, 'company_id' => 1]);
 
-        $this->getJson('/api/autocount/invoices/queued')
+        $this->getJson('/api/autocount/invoices/queued?book=OC')
             ->assertStatus(200)
             ->assertJsonPath('0.id', $queued)
             ->assertJsonPath('0.paymentterm', '2');
+    }
+
+    /** @test */
+    public function queued_endpoint_only_returns_invoices_for_the_connected_account_book()
+    {
+        $this->makeCompany(1, 'OC');
+        $this->makeCompany(2, 'OS');
+
+        // One queued invoice per branch; only the OC branch's should come back.
+        $oc = $this->makeInvoice(['invoiceno' => 'OC-1', 'autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'company_id' => 1]);
+        $this->makeInvoice(['invoiceno' => 'OS-1', 'autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'company_id' => 2]);
+
+        $this->getJson('/api/autocount/invoices/queued?book=OC')
+            ->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.id', $oc)
+            ->assertJsonPath('0.company_id', 1);
+    }
+
+    /** @test */
+    public function queued_endpoint_returns_empty_when_book_matches_no_branch()
+    {
+        $this->makeCompany(1, 'OC');
+        $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'company_id' => 1]);
+
+        $this->getJson('/api/autocount/invoices/queued?book=UNKNOWN')
+            ->assertStatus(200)
+            ->assertExactJson([]);
+    }
+
+    /** @test */
+    public function queued_endpoint_returns_empty_when_book_is_missing()
+    {
+        $this->makeCompany(1, 'OC');
+        $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'company_id' => 1]);
+
+        // No book param -> we cannot tell which account book is connected, so sync nothing.
+        $this->getJson('/api/autocount/invoices/queued')
+            ->assertStatus(200)
+            ->assertExactJson([]);
     }
 
     /** @test */
