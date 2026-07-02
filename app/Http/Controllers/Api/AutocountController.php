@@ -44,10 +44,13 @@ class AutocountController extends Controller
             })->values();
 
             return [
-                'id'         => $invoice->id,
-                'invoiceno'  => $invoice->invoiceno,
-                'date'       => Carbon::parse($invoice->getRawOriginal('date'))->format('Y-m-d'),
-                'company_id' => $invoice->company_id,
+                'id'          => $invoice->id,
+                'invoiceno'   => $invoice->invoiceno,
+                'date'        => Carbon::parse($invoice->getRawOriginal('date'))->format('Y-m-d'),
+                'company_id'  => $invoice->company_id,
+                // Payment-term code (1=Cash, 2=Credit, 3=Online BankIn, 4=E-wallet,
+                // 5=Cheque); the plugin uses it to pick a credit term for new debtors.
+                'paymentterm' => $invoice->paymentterm ?? ($customer->paymentterm ?? null),
                 'customer'   => [
                     'code'     => $customer->code ?? null,
                     'company'  => $customer->company ?? null,

@@ -26,6 +26,7 @@ class AutocountSyncTest extends TestCase
             $table->date('date')->nullable();
             $table->integer('customer_id')->nullable();
             $table->integer('company_id')->nullable();
+            $table->string('paymentterm')->nullable();
             $table->integer('status')->default(0);
             $table->tinyInteger('autocount_status')->default(0);
             $table->string('autocount_docno')->nullable();
@@ -48,6 +49,7 @@ class AutocountSyncTest extends TestCase
             $table->bigIncrements('id');
             $table->string('code')->nullable();
             $table->string('company')->nullable();
+            $table->string('paymentterm')->nullable();
             $table->string('phone')->nullable();
             $table->string('address')->nullable();
             $table->string('postcode')->nullable();
@@ -123,10 +125,10 @@ class AutocountSyncTest extends TestCase
     /** @test */
     public function queued_endpoint_returns_queued_invoices_with_details()
     {
-        DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd']);
+        DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd', 'paymentterm' => '1']);
         DB::table('products')->insert(['id' => 1, 'code' => 'P001', 'name' => 'Widget']);
 
-        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED]);
+        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => '2']);
         $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_NOT_SYNCED]); // must be excluded
 
         DB::table('invoice_details')->insert([
@@ -139,9 +141,24 @@ class AutocountSyncTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonCount(1)
             ->assertJsonPath('0.id', $queued)
+            ->assertJsonPath('0.paymentterm', '2')          // invoice's own term wins
             ->assertJsonPath('0.customer.code', '300-A001')
             ->assertJsonPath('0.details.0.item_code', 'P001')
             ->assertJsonPath('0.details.0.quantity', 3);
+    }
+
+    /** @test */
+    public function queued_endpoint_falls_back_to_customer_payment_term()
+    {
+        DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd', 'paymentterm' => '2']);
+
+        // Invoice has no payment term of its own; the customer's should be used.
+        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => null]);
+
+        $this->getJson('/api/autocount/invoices/queued')
+            ->assertStatus(200)
+            ->assertJsonPath('0.id', $queued)
+            ->assertJsonPath('0.paymentterm', '2');
     }
 
     /** @test */
