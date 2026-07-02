@@ -13,6 +13,8 @@ use App\Http\Controllers\AppBaseController;
 use Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use App\Models\Role;
+use App\Models\User;
 
 class UserController extends AppBaseController
 {
@@ -60,8 +62,9 @@ class UserController extends AppBaseController
         $input = $request->all();
 
         $input['password'] = Hash::make($input['password']);
-        $user = $this->userRepository->create($input);  
-
+        $role = Role::find($input['role_id']);
+        $input['is_super_admin'] = $role && $role->name === 'superadmin';
+        $user = $this->userRepository->create($input);
 
         $userRole = [
             "model_id" => $user["id"],
@@ -85,7 +88,7 @@ class UserController extends AppBaseController
     public function show($id)
     {
         $id = Crypt::decrypt($id);
-        $user = $this->userRepository->find($id);
+        $user = User::withoutGlobalScope('company')->find($id);
 
         if (empty($user)) {
             Flash::error('User not found');
@@ -110,7 +113,7 @@ class UserController extends AppBaseController
     public function edit($id)
     {
         $id = Crypt::decrypt($id);
-        $user = $this->userRepository->find($id);
+        $user = User::withoutGlobalScope('company')->find($id);
 
         if (empty($user)) {
             Flash::error('User not found');
@@ -137,7 +140,7 @@ class UserController extends AppBaseController
     {
         $input = $request->all();
         $id = Crypt::decrypt($id);
-        $user = $this->userRepository->find($id);
+        $user = User::withoutGlobalScope('company')->find($id);
 
         if (empty($user)) {
             Flash::error('User not found');
@@ -146,10 +149,11 @@ class UserController extends AppBaseController
         }
 
         $input['password'] = Hash::make($input['password']);
+        $role = Role::find($input['role_id']);
+        $input['is_super_admin'] = $role && $role->name === 'superadmin';
         $user = $this->userRepository->update($input, $id);
-        
 
-        $userHasRole = $this->userHasRoleRepository->where('model_id', $id)->first();  // Use Eloquent 'where' and 'first'
+        $userHasRole = $this->userHasRoleRepository->where('model_id', $id)->first();
 
         if($userHasRole)
         {
@@ -165,7 +169,7 @@ class UserController extends AppBaseController
                 "model_id" => $user["id"],
                 "role_id" => $input["role_id"]
             ];
-    
+
             $userHasRole = $this->userHasRoleRepository->create($userRole);
         }
        

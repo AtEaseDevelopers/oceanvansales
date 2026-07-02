@@ -21,6 +21,7 @@ return [
     'driver' => 'Driver',
     'driver_code' => 'Driver code',
     'driver_name' => 'Driver name',
+    'lorry' => 'Lorry',
     'edit' => 'Edit',
     'edit_assigns' => 'Edit Assigns',
     'group' => 'Group',

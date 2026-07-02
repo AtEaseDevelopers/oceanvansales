@@ -31,7 +31,7 @@ class UpdateProductRequest extends FormRequest
                 Rule::unique('products', 'code')->where('company_id', $companyId)->ignore($id),
             ],
             'name' => 'required|string|max:255',
-            'price' => 'required|numeric',
+            'price' => 'nullable|numeric',
             'status' => 'required',
             'created_at' => 'nullable',
             'updated_at' => 'nullable',

@@ -30,9 +30,9 @@ class AssignDataTable extends DataTable
     public function query(Assign $model)
     {
         return $model->newQuery()
-        ->with('driver:id,name')
-        ->with('customer:id,company')
-        ->select('assigns.*');
+        ->leftJoin('lorrys', 'lorrys.id', '=', 'assigns.lorry_id')
+        ->leftJoin('customers', 'customers.id', '=', 'assigns.customer_id')
+        ->select('assigns.*', 'lorrys.lorryno', 'customers.company as customer_company');
     }
 
     /**
@@ -152,13 +152,13 @@ class AssignDataTable extends DataTable
             'orderable' => false,
             'searchable' => false]),
 
-            'driver_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.driver'),
-            'data' => 'driver.name',
-            'name' => 'driver.name']),
+            'lorry_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.lorry'),
+            'data' => 'lorryno',
+            'name' => 'lorrys.lorryno']),
 
             'customer_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('assign.customer'),
-            'data' => 'customer.company',
-            'name' => 'customer.company']),
+            'data' => 'customer_company',
+            'name' => 'customers.company']),
 
             'sequence'
 

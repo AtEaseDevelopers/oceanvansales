@@ -1,19 +1,40 @@
 <!-- Code Field -->
 <div class="form-group col-sm-6">
     {!! Form::label('code', __('products.code')) !!}<span class="asterisk"> *</span>
-    {!! Form::text('code', null, ['class' => 'form-control', 'maxlength' => 255, 'autofocus']) !!} <!-- Removed duplicate maxlength -->
+    {!! Form::text('code', null, ['class' => 'form-control', 'maxlength' => 255, 'autofocus']) !!}
 </div>
 
 <!-- Name Field -->
 <div class="form-group col-sm-6">
     {!! Form::label('name', __('products.name')) !!}<span class="asterisk"> *</span>
-    {!! Form::text('name', null, ['class' => 'form-control', 'maxlength' => 255]) !!} <!-- Removed duplicate maxlength -->
+    {!! Form::text('name', null, ['class' => 'form-control', 'maxlength' => 255]) !!}
 </div>
 
-<!-- Price Field -->
-<div class="form-group col-sm-6">
-    {!! Form::label('price', __('products.price')) !!}<span class="asterisk"> *</span>
-    {!! Form::number('price', null, ['class' => 'form-control', 'step' => '0.01']) !!}
+<!-- Prices Field -->
+<div class="form-group col-sm-12">
+    {!! Form::label('price_tiers', 'Prices') !!}<span class="asterisk"> *</span>
+    <div id="price-tiers-container">
+        @if(isset($product) && $product->prices->count() > 0)
+            @foreach($product->prices as $i => $tier)
+            <div class="price-tier-row input-group mb-2" style="max-width:300px;">
+                <div class="input-group-prepend"><span class="input-group-text">RM</span></div>
+                <input type="number" name="price_tiers[{{ $i }}][price]" value="{{ $tier->price }}" class="form-control" step="0.01" min="0" placeholder="0.00">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-danger btn-sm remove-tier">Remove</button>
+                </div>
+            </div>
+            @endforeach
+        @else
+            <div class="price-tier-row input-group mb-2" style="max-width:300px;">
+                <div class="input-group-prepend"><span class="input-group-text">RM</span></div>
+                <input type="number" name="price_tiers[0][price]" value="{{ isset($product) ? $product->price : '' }}" class="form-control" step="0.01" min="0" placeholder="0.00">
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-danger btn-sm remove-tier">Remove</button>
+                </div>
+            </div>
+        @endif
+    </div>
+    <button type="button" class="btn btn-outline-success btn-sm mt-1" id="add-tier">+ Add Price</button>
 </div>
 
 <!-- Type Field -->
@@ -46,7 +67,6 @@
 </div>
 
 @push('scripts')
-
    <style>
         #classification_code + .dropdown-menu,
         select[name="classification_code"] + .dropdown-menu,
@@ -67,13 +87,31 @@
         }
     </style>
 
-    
     <script>
         $(document).keyup(function(e) {
             if (e.key === "Escape") {
                 $('form a.btn-secondary')[0].click();
             }
         });
+
+        var tierIndex = {{ isset($product) ? max($product->prices->count(), 1) : 1 }};
+
+        $('#add-tier').click(function () {
+            var row = '<div class="price-tier-row input-group mb-2" style="max-width:300px;">' +
+                '<div class="input-group-prepend"><span class="input-group-text">RM</span></div>' +
+                '<input type="number" name="price_tiers[' + tierIndex + '][price]" class="form-control" step="0.01" min="0" placeholder="0.00">' +
+                '<div class="input-group-append"><button type="button" class="btn btn-danger btn-sm remove-tier">Remove</button></div>' +
+                '</div>';
+            $('#price-tiers-container').append(row);
+            tierIndex++;
+        });
+
+        $(document).on('click', '.remove-tier', function () {
+            if ($('.price-tier-row').length > 1) {
+                $(this).closest('.price-tier-row').remove();
+            }
+        });
+
         $(document).ready(function () {
             HideLoad();
         });

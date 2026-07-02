@@ -1,9 +1,9 @@
 <!-- Driver Id Field -->
 <div class="form-group col-sm-6">
-    {!! Form::label('driver_id', __('assign.driver')) !!}<span class="asterisk"> *</span>
-    {!! Form::select('driver_id', $driverItems, null, [
-        'class' => 'form-control select2-driver',
-        'placeholder' => __('assign.placeholder_pick_driver'),
+    {!! Form::label('lorry_id', __('assign.lorry')) !!}<span class="asterisk"> *</span>
+    {!! Form::select('lorry_id', $lorryItems, null, [
+        'class' => 'form-control select2-lorry',
+        'placeholder' => __('assign.placeholder_pick_lorry'),
         'autofocus',
         'required' => true
     ]) !!}
@@ -81,9 +81,9 @@
         });
         
         $(document).ready(function() {
-            // Initialize Select2 for driver field
-            $('.select2-driver').select2({
-                placeholder: "Search for a driver...",
+            // Initialize Select2 for lorry field
+            $('.select2-lorry').select2({
+                placeholder: "Search for a lorry...",
                 allowClear: true,
                 width: '100%'
             });
@@ -96,33 +96,33 @@
             });
             
             // Load initial data if editing
-            var driverId = $('select[name="driver_id"]').val();
+            var lorryId = $('select[name="lorry_id"]').val();
             var groupId = $('#group').val();
-            if (driverId && groupId) {
-                loadSequenceData(groupId, driverId);
+            if (lorryId && groupId) {
+                loadSequenceData(groupId, lorryId);
             }
             
             HideLoad();
         });
 
         $('#group').on('change', function() {
-            var driverId = $('select[name="driver_id"]').val();
-            if (!driverId) {
-                noti('w', 'Warning', 'Please select a driver first');
+            var lorryId = $('select[name="lorry_id"]').val();
+            if (!lorryId) {
+                noti('w', 'Warning', 'Please select a lorry first');
                 return;
             }
-            loadSequenceData($(this).val(), driverId);
+            loadSequenceData($(this).val(), lorryId);
         });
 
-        $('select[name="driver_id"]').on('change', function() {
+        $('select[name="lorry_id"]').on('change', function() {
             var groupId = $('#group').val();
             if (groupId) {
                 loadSequenceData(groupId, $(this).val());
             }
         });
 
-        function loadSequenceData(groupId, driverId) {
-            if (!groupId || !driverId) return;
+        function loadSequenceData(groupId, lorryId) {
+            if (!groupId || !lorryId) return;
             
             ShowLoad();
             $('#sequence_details').html('');
@@ -134,7 +134,7 @@
                 data: {
                     '_token': '{{ csrf_token() }}',
                     'group_id': groupId,
-                    'driver_id': driverId
+                    'lorry_id': lorryId
                 },
                 success: function(response) {
                     if (response.status) {

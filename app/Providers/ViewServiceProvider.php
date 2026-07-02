@@ -169,8 +169,8 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('customerItems', $customerItems);
         });
         View::composer(['assigns.fields','drivers.assign','assigns.massfields'], function ($view) {
-            $driverItems = Driver::orderBy("name")->pluck('name','id')->toArray();
-            $view->with('driverItems', $driverItems);
+            $lorryItems = Lorry::orderBy("lorryno")->pluck('lorryno','id')->toArray();
+            $view->with('lorryItems', $lorryItems);
         });
         View::composer(['assigns.massfields'], function ($view) {
             $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
@@ -424,7 +424,11 @@ class ViewServiceProvider extends ServiceProvider
             $view->with('userItems', $userItems);
         });
         View::composer(['users.fields'], function ($view) {
-            $roleItems = Role::pluck('name','id')->toArray();
+            $query = Role::query();
+            if (!auth()->user()?->is_super_admin) {
+                $query->where('name', '!=', 'superadmin');
+            }
+            $roleItems = $query->pluck('name', 'id')->toArray();
             $view->with('roleItems', $roleItems);
         });
 

@@ -31,14 +31,28 @@ class UserDataTable extends DataTable
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
 
-        return $model->newQuery()
+        $isSuperAdmin = auth()->user()?->is_super_admin;
+
+        $query = $model->newQuery()
             ->withoutGlobalScope('company')
-            ->where(function ($q) use ($companyId) {
-                $q->where('users.is_super_admin', true);
-                if ($companyId) {
-                    $q->orWhere('users.company_id', $companyId);
-                }
-            })
+            ->where('users.is_super_admin', false);
+
+        if ($companyId) {
+            $query->where('users.company_id', $companyId);
+        }
+
+        if ($isSuperAdmin) {
+            $query = $model->newQuery()
+                ->withoutGlobalScope('company')
+                ->where(function ($q) use ($companyId) {
+                    $q->where('users.is_super_admin', true);
+                    if ($companyId) {
+                        $q->orWhere('users.company_id', $companyId);
+                    }
+                });
+        }
+
+        return $query
             ->leftJoin('model_has_roles', function ($join) {
                 $join->on('users.id', '=', 'model_has_roles.model_id');
             })

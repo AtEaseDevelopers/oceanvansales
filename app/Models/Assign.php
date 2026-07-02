@@ -30,7 +30,7 @@ class Assign extends Model
 
 
     public $fillable = [
-        'driver_id',
+        'lorry_id',
         'customer_id',
         'sequence'
     ];
@@ -42,7 +42,7 @@ class Assign extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        'driver_id' => 'integer',
+        'lorry_id' => 'integer',
         'customer_id' => 'integer',
         'sequence' => 'integer'
     ];
@@ -53,7 +53,7 @@ class Assign extends Model
      * @var array
      */
     public static $rules = [
-        'driver_id' => 'required',
+        'lorry_id' => 'required',
         'customer_id' => 'required',
         'sequence' => 'required',
         'created_at' => 'nullable|nullable',
@@ -65,9 +65,9 @@ class Assign extends Model
         return $this->belongsTo(\App\Models\Customer::class, 'customer_id');
     }
 
-    public function driver()
+    public function lorry()
     {
-        return $this->belongsTo(\App\Models\Driver::class, 'driver_id');
+        return $this->belongsTo(\App\Models\Lorry::class, 'lorry_id');
     }
     
 }
