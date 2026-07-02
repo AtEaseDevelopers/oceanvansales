@@ -112,7 +112,7 @@ class Customer extends Model
      **/
     public function groups()
     {
-        return $this->belongsTo(\App\Models\Code::class, 'group', 'value')->where('code','customer_group');
+        return $this->belongsTo(\App\Models\Code::class, 'group', 'value')->where('code','customer_group')->where('company_id', $this->company_id);
     }
 
     public function supervisor()
@@ -137,7 +137,7 @@ class Customer extends Model
     }
 
     public function getGroupDescriptionAttribute(){
-        return Code::where('code','customer_group')->whereRaw('find_in_set(codes.value, "'.$this->group.'")')->select(DB::raw("GROUP_CONCAT(codes.description) as group_descr"))->get()->first()->group_descr ?? '';
+        return Code::where('code','customer_group')->where('company_id', $this->company_id)->whereRaw('find_in_set(codes.value, "'.$this->group.'")')->select(DB::raw("GROUP_CONCAT(codes.description) as group_descr"))->get()->first()->group_descr ?? '';
     }
 
 }
