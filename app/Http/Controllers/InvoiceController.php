@@ -462,6 +462,32 @@ class InvoiceController extends AppBaseController
         return $count;
     }
 
+    /**
+     * Queue the selected invoices for AutoCount sync.
+     * The desktop plugin polls queued invoices and creates the Sales Invoice.
+     * Already-synced invoices are skipped so we never duplicate a document.
+     */
+    public function queueAutocount(Request $request)
+    {
+        $ids = $request->input('ids', []);
+
+        if (empty($ids)) {
+            return response()->json(['message' => 'Please select at least one invoice.'], 422);
+        }
+
+        $count = Invoice::whereIn('id', $ids)
+            ->where('autocount_status', '!=', Invoice::AUTOCOUNT_SYNCED)
+            ->update([
+                'autocount_status' => Invoice::AUTOCOUNT_QUEUED,
+                'autocount_error'  => null,
+            ]);
+
+        return response()->json([
+            'message' => $count . ' invoice(s) queued for AutoCount.',
+            'count'   => $count,
+        ]);
+    }
+
     public function getcustomer($id)
     {
         $customer = Customer::where('id',$id)->first();

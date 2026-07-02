@@ -25,10 +25,10 @@ class UpdateCustomerRequest extends FormRequest
     public function rules()
     {
         $id = Crypt::decrypt($this->route('customer'));
-        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $rules = [
+            // Code must be globally unique (maps 1:1 to an AutoCount debtor AccNo).
             'code' => ['required', 'string', 'max:255',
-                Rule::unique('customers', 'code')->where('company_id', $companyId)->ignore($id),
+                Rule::unique('customers', 'code')->ignore($id),
             ],
             'company' => 'required|string|max:255',
             'paymentterm' => 'required',

@@ -149,7 +149,20 @@ class InvoiceDataTable extends DataTable
                     'targets' => 9,
                     'render' => 'function(data, type){return data == 1 ? "Completed" : "New";}'
                     ],
-                  
+                    [
+                    'targets' => 10,
+                    'orderable' => false,
+                    'render' => 'function(data, type, row){
+                            var labels = {0:"Not Synced",1:"Queued",2:"Synced",3:"Failed"};
+                            var label = labels[data] || "Not Synced";
+                            if(type !== "display"){ return label; }
+                            var cls = {0:"secondary",1:"info",2:"success",3:"danger"}[data] || "secondary";
+                            var tip = data == 3 ? (row.autocount_error || "") : (data == 2 ? (row.autocount_docno || "") : "");
+                            var title = tip ? $("<div>").text(tip).html() : "";
+                            return "<span class=\"badge badge-"+cls+"\" title=\""+title+"\">"+label+"</span>";
+                        }'
+                    ],
+
                 ],
                 'initComplete' => 'function(){
                     var columns = this.api().init().columns;
@@ -254,6 +267,13 @@ class InvoiceDataTable extends DataTable
                 'title' => trans('invoices.status'),
                 'data' => 'status',
                 'name' => 'invoices.status'
+            ]),
+
+            'autocount_status' => new \Yajra\DataTables\Html\Column([
+                'title' => 'AutoCount',
+                'data' => 'autocount_status',
+                'name' => 'invoices.autocount_status',
+                'searchable' => false
             ]),
         ];
 

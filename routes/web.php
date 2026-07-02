@@ -402,6 +402,7 @@ Route::group(['middleware' => ['auth']], function() {
         Route::resource('invoices', App\Http\Controllers\InvoiceController::class);
         Route::post('/invoices/massdestroy', [App\Http\Controllers\InvoiceController::class, 'massdestroy']);
         Route::post('/invoices/massupdatestatus', [App\Http\Controllers\InvoiceController::class, 'massupdatestatus']);
+        Route::post('/invoices/queue-autocount', [App\Http\Controllers\InvoiceController::class, 'queueAutocount'])->name('invoices.queue-autocount');
         //Invoice Detail
         Route::get('invoiceDetails/getprice/{invoice_id}/{product_id}', [App\Http\Controllers\InvoiceDetailController::class, 'getprice']);
         Route::resource('invoiceDetails', App\Http\Controllers\InvoiceDetailController::class);

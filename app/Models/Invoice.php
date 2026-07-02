@@ -23,6 +23,12 @@ class Invoice extends Model
     public const STATUS_SYNCED_TO_XERO = 1;
     public const STATUS_VOIDED = 2;
 
+    // AutoCount sync states (autocount_status column)
+    public const AUTOCOUNT_NOT_SYNCED = 0;
+    public const AUTOCOUNT_QUEUED     = 1;
+    public const AUTOCOUNT_SYNCED     = 2;
+    public const AUTOCOUNT_FAILED     = 3;
+
 
     public $fillable = [
         'invoiceno',
@@ -38,6 +44,10 @@ class Invoice extends Model
         'chequeno',
         'attachment',
         'trip_id',
+        'autocount_status',
+        'autocount_docno',
+        'autocount_error',
+        'autocount_synced_at',
     ];
 
     /**
@@ -59,6 +69,8 @@ class Invoice extends Model
         'remark' => 'string',
         'attachment' => 'string',
         'trip_id' => 'integer',
+        'autocount_status' => 'integer',
+        'autocount_synced_at' => 'datetime',
     ];
 
     /**

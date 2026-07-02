@@ -23,10 +23,12 @@ class CreateCustomerRequest extends FormRequest
 
     public function rules()
     {
-        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $rules = Customer::$rules;
+        // Code must be globally unique: it maps 1:1 to an AutoCount debtor AccNo, and the
+        // plugin auto-creates a debtor from it, so the same code must never point at two
+        // different customers (even across companies).
         $rules['code'] = ['required', 'string', 'max:255',
-            Rule::unique('customers', 'code')->where('company_id', $companyId),
+            Rule::unique('customers', 'code'),
         ];
 
         if ($this->eInvoiceService->isEnabled()) {
