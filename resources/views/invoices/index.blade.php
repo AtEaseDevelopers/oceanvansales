@@ -19,6 +19,9 @@
                             @endnoeinvoice
                              <a class="pull-right text-success pr-2" id="massactive" href="#" alt="Mass active"><i class="fa fa-check fa-lg"></i></a>
                              <!--<a class="pull-right pr-2" id="masssyncxero" href="#" alt="Mass Sync to Xero"><i class="fa fa-refresh fa-lg"></i></a>-->
+                             <button type="button" class="btn btn-success btn-sm pull-right mr-2" id="syncautocount" title="Sync selected invoices to AutoCount">
+                                <i class="fa fa-cloud-upload"></i> Sync to AutoCount
+                             </button>
                             @einvoice
                              <button type="button" class="btn btn-primary btn-sm pull-right mr-2" onclick="submitEinvoice()" title="Submit E-Invoice">
                                 <i class="fa fa-file-text-o"></i> Submit E-Invoice
@@ -186,6 +189,50 @@
                 error: function(error) {
                     noti('e','Please contact your administrator',error.responseJSON.message)
                     HideLoad();
+                }
+            });
+        }
+
+        $(document).on("click", "#syncautocount", function(e){
+            var m = "";
+            if(window.checkboxid.length == 0){
+                noti('i','Info','Please select at least one row');
+                return;
+            }else if(window.checkboxid.length == 1){
+                m = "Confirm to sync 1 invoice to AutoCount?"
+            }else{
+                m = "Confirm to sync " + window.checkboxid.length + " invoices to AutoCount?"
+            }
+            $.confirm({
+                title: 'Sync to AutoCount',
+                content: m,
+                buttons: {
+                    Yes: function() {
+                        syncautocount(window.checkboxid);
+                    },
+                    No: function() {
+                        return;
+                    }
+                }
+            });
+        });
+        function syncautocount(ids){
+            ShowLoad();
+            $.ajax({
+                url: "{{ url('/invoices/queue-autocount') }}",
+                type:"POST",
+                data:{
+                    ids: ids,
+                    _token: "{{ csrf_token() }}"
+                },
+                success:function(response){
+                    window.checkboxid = [];
+                    $('.buttons-reload').click();
+                    noti('s','Queued for AutoCount', response.message);
+                },
+                error: function(error) {
+                    HideLoad();
+                    noti('e','Please contact your administrator', error.responseJSON?.message || 'Failed to queue invoices');
                 }
             });
         }
