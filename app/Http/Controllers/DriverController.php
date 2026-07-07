@@ -93,7 +93,7 @@ class DriverController extends AppBaseController
             return redirect(route('drivers.index'));
         }
 
-        $assign = Assign::with('customer')->where('driver_id',$id)->get()->toArray();
+        $assign = Assign::with('customer')->where('lorry_id',$driver->lorry_id)->get()->toArray();
         return view('drivers.show')->with('driver', $driver)->with('assign',$assign)->with('id',$id);
     }
 
@@ -206,7 +206,7 @@ class DriverController extends AppBaseController
             return redirect(route('drivers.index'));
         }
 
-        $Assign = Assign::where('driver_id',$id)->get()->toArray();
+        $Assign = Assign::where('lorry_id',$driver->lorry_id)->get()->toArray();
         if(count($Assign)>0){
             Flash::error('Unable to delete '.$driver->name.', '.$driver->name.' is being used in Assign');
 
@@ -259,7 +259,8 @@ class DriverController extends AppBaseController
                 continue;
             }
 
-            $Assign = Assign::where('driver_id',$id)->get()->toArray();
+            $driverModel = $this->driverRepository->find($id);
+            $Assign = $driverModel ? Assign::where('lorry_id',$driverModel->lorry_id)->get()->toArray() : [];
             if(count($Assign)>0){
                 continue;
             }
@@ -325,7 +326,7 @@ class DriverController extends AppBaseController
         }
 
         $assign = new Assign();
-        $assign->driver_id = $id;
+        $assign->lorry_id = $driver->lorry_id;
         $assign->customer_id = $input['customer_id'];
         $assign->sequence = $input['sequence'];
         $assign->save();
@@ -351,7 +352,7 @@ class DriverController extends AppBaseController
 
         Flash::success(__('drivers.assign_deleted_successfully'));
 
-        return redirect(route('drivers.show',encrypt($assign->driver_id)));
+        return redirect()->back();
     }
 
 }
