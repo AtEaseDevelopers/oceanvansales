@@ -2419,22 +2419,23 @@ class DriverController extends Controller
                     'data' => null
                 ], 400);
             }
-            $inventorybalance = InventoryBalance::where('lorry_id',$trip->lorry_id)
-            ->leftjoin('products','products.id','=','inventory_balances.product_id')
-            ->get(['inventory_balances.id','inventory_balances.quantity','inventory_balances.product_id','products.name'])->toarray();
-            if(count($inventorybalance) == 0){
-                return response()->json([
-                    'result' => false,
-                    'message' => __LINE__.$this->message_separator.'api.message.no_stock_found',
-                    'data' => null
-                ], 200);
-            }else{
-                return response()->json([
-                    'result' => true,
-                    'message' => __LINE__.$this->message_separator.'api.message.stock_found',
-                    'data' => $inventorybalance
-                ], 200);
-            }
+            $inventorybalance = Product::where('products.company_id', $driver->company_id)
+                ->where('products.status', 1)
+                ->leftJoin('inventory_balances', function($join) use ($trip) {
+                    $join->on('inventory_balances.product_id', '=', 'products.id')
+                         ->where('inventory_balances.lorry_id', '=', $trip->lorry_id);
+                })
+                ->get([
+                    'inventory_balances.id',
+                    'products.id as product_id',
+                    'products.name',
+                    DB::raw('COALESCE(inventory_balances.quantity, 0) as quantity')
+                ])->toArray();
+            return response()->json([
+                'result' => true,
+                'message' => __LINE__.$this->message_separator.'api.message.stock_found',
+                'data' => $inventorybalance
+            ], 200);
         }
         catch(Exception $e){
             return response()->json([
