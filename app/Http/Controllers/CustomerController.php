@@ -91,6 +91,7 @@ class CustomerController extends AppBaseController
 
         $customer->group = DB::table('codes')
         ->where('codes.code', '=', 'customer_group')
+        ->where('codes.company_id', '=', $customer->company_id)
         ->whereRaw('find_in_set(codes.value, "'.$customer->group.'")')
         ->selectRaw('GROUP_CONCAT(codes.description) as group_descr')
         ->get()->first()->group_descr;

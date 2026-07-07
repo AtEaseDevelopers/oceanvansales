@@ -108,7 +108,8 @@ class CustomerDataTable extends DataTable
             })
             ->leftJoin('codes', function ($join) {
                 $join->on('customers.group', '=', 'codes.value')
-                    ->where('codes.code', '=', 'customer_group');
+                    ->where('codes.code', '=', 'customer_group')
+                    ->on('codes.company_id', '=', 'customers.company_id');
             })
             ->select(
                 'customers.*',
@@ -255,7 +256,7 @@ class CustomerDataTable extends DataTable
                                 var input = \'<input type="text" placeholder="Search ">\';
                             }
                             $(input).appendTo($(column.footer()).empty()).on(\'change\', function(){
-                                column.search($(this).val(),true,false).draw();
+                                column.search($(this).val(),false,false).draw();
                                 ShowLoad();
                             })
                         }
