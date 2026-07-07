@@ -62,6 +62,8 @@ class AutocountSyncTest extends TestCase
             $table->bigIncrements('id');
             $table->string('code')->nullable();
             $table->string('name')->nullable();
+            $table->float('price', 10, 2)->nullable();
+            $table->string('classification_code')->nullable();
         });
 
         // Each company is a branch, mapped to one AutoCount account book via its code.
@@ -140,7 +142,7 @@ class AutocountSyncTest extends TestCase
     {
         $this->makeCompany(1, 'OC');
         DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd', 'paymentterm' => '1']);
-        DB::table('products')->insert(['id' => 1, 'code' => 'P001', 'name' => 'Widget']);
+        DB::table('products')->insert(['id' => 1, 'code' => 'P001', 'name' => 'Widget', 'price' => 12.50, 'classification_code' => '022']);
 
         $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'paymentterm' => '2', 'company_id' => 1]);
         $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_NOT_SYNCED, 'company_id' => 1]); // must be excluded
@@ -158,7 +160,11 @@ class AutocountSyncTest extends TestCase
             ->assertJsonPath('0.paymentterm', '2')          // invoice's own term wins
             ->assertJsonPath('0.customer.code', '300-A001')
             ->assertJsonPath('0.details.0.item_code', 'P001')
-            ->assertJsonPath('0.details.0.quantity', 3);
+            ->assertJsonPath('0.details.0.quantity', 3)
+            // Product-master fields for creating the item in AutoCount from web data.
+            ->assertJsonPath('0.details.0.item_name', 'Widget')
+            ->assertJsonPath('0.details.0.item_price', 12.5)
+            ->assertJsonPath('0.details.0.classification_code', '022');
     }
 
     /** @test */

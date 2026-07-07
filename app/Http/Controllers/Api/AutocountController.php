@@ -66,6 +66,11 @@ class AutocountController extends Controller
                     'description' => $detail->remark ?: ($product->name ?? ''),
                     'quantity'    => $detail->quantity,
                     'unit_price'  => $detail->price,
+                    // Product-master fields so the plugin can create the item in AutoCount
+                    // from the web data (not generic defaults) when it does not yet exist.
+                    'item_name'           => $product->name ?? null,
+                    'item_price'          => $product->price ?? null,
+                    'classification_code' => $product->classification_code ?? null,
                 ];
             })->values();
 
