@@ -111,7 +111,12 @@ class InventoryBalanceController extends AppBaseController
     public function stockout(Request $request)
     {
         $data = $request->all();
-        $lorryIds = is_array($data['lorry_id']) ? $data['lorry_id'] : [$data['lorry_id']];
+        $lorryIds = (array) $request->input('lorry_id', []);
+
+        if (empty($lorryIds)) {
+            Flash::error('Please select at least one lorry.');
+            return redirect(route('inventoryBalances.index'));
+        }
 
         foreach ($lorryIds as $lorryId) {
             $inventoryBalance = InventoryBalance::where('product_id',$data['product_id'])->where('lorry_id',$lorryId)->first();

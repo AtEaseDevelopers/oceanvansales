@@ -326,7 +326,7 @@
             if (lorryIds.length > 0 && productId) {
                 ShowLoad();
                 $.ajax({
-                    url: '{{ ENV("APP_URL") }}' + '/inventoryBalances/getstock/' + lorryIds.join(',') + '/' + productId,
+                    url: '/inventoryBalances/getstock/' + lorryIds.join(',') + '/' + productId,
                     type: 'GET',
                     success: function(data) {
                         // Always enable input — negative stock is allowed
