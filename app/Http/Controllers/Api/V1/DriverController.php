@@ -915,12 +915,12 @@ class DriverController extends Controller
             }
             //process
             $task = Task::where('driver_id', $driver->id)
-                ->where('date',date('Y-m-d'))
                 ->where(function ($query) use ($trip) {
                     $query->where('trip_id', $trip->id)
-                        ->orWhere('trip_id', null);
+                        ->orWhere(function ($q) {
+                            $q->where('trip_id', null)->where('date', date('Y-m-d'));
+                        });
                 })
-                // ->whereIn('trip_id',[NULL,$trip->id])
                 ->with('customer.activefoc')
                 ->with('invoice.invoicedetail.product:id,code,name')
                 ->get()->toarray();
@@ -939,7 +939,7 @@ class DriverController extends Controller
                                 })
                             ->where('products.status','1')
                             ->where('products.company_id', $driver->company_id)
-                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
+                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'),DB::raw('special_prices.price as "special_price"'))
                             ->get();
                         $task[$c]['customer']['product'] = $this->appendProductPrices($products);
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
@@ -1019,14 +1019,14 @@ class DriverController extends Controller
             }
             //process
             $task = Task::where('driver_id', $driver->id)
-                ->where('date',date('Y-m-d'))
                 //->where('status','!=',9)
                 //->where('status','!=',0)
                 ->where(function ($query) use ($trip) {
                     $query->where('trip_id', $trip->id)
-                        ->orWhere('trip_id', null);
+                        ->orWhere(function ($q) {
+                            $q->where('trip_id', null)->where('date', date('Y-m-d'));
+                        });
                 })
-                // ->whereIn('trip_id',[NULL,$trip->id])
                 ->with('customer.activefoc')
                 ->with('invoice.invoicedetail.product:id,code,name')
                 ->paginate($size);
@@ -1046,7 +1046,7 @@ class DriverController extends Controller
                                 })
                             ->where('products.status','1')
                             ->where('products.company_id', $driver->company_id)
-                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
+                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'),DB::raw('special_prices.price as "special_price"'))
                             ->get();
                         $task[$c]['customer']['product'] = $this->appendProductPrices($products);
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
@@ -1295,7 +1295,7 @@ class DriverController extends Controller
                     })
                 ->where('products.status','1')
                 ->where('products.company_id', $driver->company_id)
-                ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
+                ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'),DB::raw('special_prices.price as "special_price"'))
                 ->get();
                 return response()->json([
                     'result' => true,
@@ -4117,10 +4117,17 @@ class DriverController extends Controller
             ->groupBy('product_id');
 
         return $products->map(function ($p) use ($allPrices) {
-            unset($p->price);
-            $p->prices = isset($allPrices[$p->id])
-                ? $allPrices[$p->id]->pluck('price')->map(fn($v) => (float) $v)->values()->toArray()
-                : [];
+            $hasSpecialPrice = isset($p->special_price) && $p->special_price !== null;
+            $specialPrice = (float) $p->price;
+            unset($p->price, $p->special_price);
+
+            if ($hasSpecialPrice) {
+                $p->prices = [$specialPrice];
+            } else {
+                $p->prices = isset($allPrices[$p->id])
+                    ? $allPrices[$p->id]->pluck('price')->map(fn($v) => (float) $v)->values()->toArray()
+                    : [];
+            }
             return $p;
         });
     }
