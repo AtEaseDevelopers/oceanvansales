@@ -13,7 +13,11 @@
 <!-- Price Field -->
 <div class="form-group">
     {!! Form::label('price', __('products.price')) !!}:
-    <p>{{ number_format($product->price, 2) }}</p>
+    @if($product->prices->count() > 0)
+        <p>{{ $product->prices->map(fn($p) => 'RM ' . number_format($p->price, 2))->join(' / ') }}</p>
+    @else
+        <p>{{ $product->price ? 'RM ' . number_format($product->price, 2) : '-' }}</p>
+    @endif
 </div>
 
 <!-- Type Field -->

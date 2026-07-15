@@ -915,12 +915,12 @@ class DriverController extends Controller
             }
             //process
             $task = Task::where('driver_id', $driver->id)
-                ->where('date',date('Y-m-d'))
                 ->where(function ($query) use ($trip) {
                     $query->where('trip_id', $trip->id)
-                        ->orWhere('trip_id', null);
+                        ->orWhere(function ($q) {
+                            $q->where('trip_id', null)->where('date', date('Y-m-d'));
+                        });
                 })
-                // ->whereIn('trip_id',[NULL,$trip->id])
                 ->with('customer.activefoc')
                 ->with('invoice.invoicedetail.product:id,code,name')
                 ->get()->toarray();
@@ -931,17 +931,18 @@ class DriverController extends Controller
                         $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
                         $products = DB::table('products')
-                            ->leftJoin('special_prices', function($join) use($t)
+                            ->leftJoin('special_prices', function($join) use($t, $driver)
                                 {
                                     $join->on('special_prices.customer_id','=',DB::raw("'".$t['customer']['id']."'"));
                                     $join->on('special_prices.product_id', '=', 'products.id');
                                     $join->on('special_prices.status', '=', DB::raw("'1'"));
+                                    $join->on('special_prices.company_id', '=', DB::raw("'".$driver->company_id."'"));
                                 })
                             ->where('products.status','1')
                             ->where('products.company_id', $driver->company_id)
-                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
+                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'),DB::raw('special_prices.price as "special_price"'))
                             ->get();
-                        $task[$c]['customer']['product'] = $this->appendProductPrices($products);
+                        $task[$c]['customer']['product'] = $this->appendProductPrices($products, $driver->company_id);
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
                             ->where('companies.group_id',explode(',',$t['customer']['group'])[0])
                             ->select('companies.*')
@@ -1019,14 +1020,14 @@ class DriverController extends Controller
             }
             //process
             $task = Task::where('driver_id', $driver->id)
-                ->where('date',date('Y-m-d'))
                 //->where('status','!=',9)
                 //->where('status','!=',0)
                 ->where(function ($query) use ($trip) {
                     $query->where('trip_id', $trip->id)
-                        ->orWhere('trip_id', null);
+                        ->orWhere(function ($q) {
+                            $q->where('trip_id', null)->where('date', date('Y-m-d'));
+                        });
                 })
-                // ->whereIn('trip_id',[NULL,$trip->id])
                 ->with('customer.activefoc')
                 ->with('invoice.invoicedetail.product:id,code,name')
                 ->paginate($size);
@@ -1038,17 +1039,18 @@ class DriverController extends Controller
                         $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
                         $products = DB::table('products')
-                            ->leftJoin('special_prices', function($join) use($t)
+                            ->leftJoin('special_prices', function($join) use($t, $driver)
                                 {
                                     $join->on('special_prices.customer_id','=',DB::raw("'".$t['customer']['id']."'"));
                                     $join->on('special_prices.product_id', '=', 'products.id');
                                     $join->on('special_prices.status', '=', DB::raw("'1'"));
+                                    $join->on('special_prices.company_id', '=', DB::raw("'".$driver->company_id."'"));
                                 })
                             ->where('products.status','1')
                             ->where('products.company_id', $driver->company_id)
-                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
+                            ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'),DB::raw('special_prices.price as "special_price"'))
                             ->get();
-                        $task[$c]['customer']['product'] = $this->appendProductPrices($products);
+                        $task[$c]['customer']['product'] = $this->appendProductPrices($products, $driver->company_id);
                         $task[$c]['customer']['groupcompany'] = DB::table('companies')
                             ->where('companies.group_id',explode(',',$t['customer']['group'])[0])
                             ->select('companies.*')
@@ -1287,20 +1289,21 @@ class DriverController extends Controller
             //process
             if(isset($data['customer_id'])){
                 $products = DB::table('products')
-                ->leftJoin('special_prices', function($join) use($data)
+                ->leftJoin('special_prices', function($join) use($data, $driver)
                     {
                         $join->on('special_prices.customer_id','=',DB::raw("'".$data['customer_id']."'"));
                         $join->on('special_prices.product_id', '=', 'products.id');
                         $join->on('special_prices.status', '=', DB::raw("'1'"));
+                        $join->on('special_prices.company_id', '=', DB::raw("'".$driver->company_id."'"));
                     })
                 ->where('products.status','1')
                 ->where('products.company_id', $driver->company_id)
-                ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'))
+                ->select('products.id','products.code','products.name',DB::raw('coalesce(special_prices.price,products.price) as "price"'),DB::raw('special_prices.price as "special_price"'))
                 ->get();
                 return response()->json([
                     'result' => true,
                     'message' => __LINE__.$this->message_separator.'api.message.product_found',
-                    'data' => $this->appendProductPrices($products)
+                    'data' => $this->appendProductPrices($products, $driver->company_id)
                 ], 200);
             }else{
                 $products = DB::table('products')
@@ -1311,7 +1314,7 @@ class DriverController extends Controller
                 return response()->json([
                     'result' => true,
                     'message' => __LINE__.$this->message_separator.'api.message.product_found',
-                    'data' => $this->appendProductPrices($products)
+                    'data' => $this->appendProductPrices($products, $driver->company_id)
                 ], 200);
             }
         }
@@ -4099,7 +4102,7 @@ class DriverController extends Controller
         return \Blade::render($html, ['company' => $company]);
     }
 
-    private function appendProductPrices($products)
+    private function appendProductPrices($products, $companyId = null)
     {
         $productIds = $products->pluck('id')->toArray();
         if (empty($productIds)) {
@@ -4112,15 +4115,23 @@ class DriverController extends Controller
         $allPrices = DB::table('product_prices')
             ->whereIn('product_id', $productIds)
             ->where('status', 1)
+            ->when($companyId, fn($q) => $q->where('company_id', $companyId))
             ->orderBy('id')
             ->get()
             ->groupBy('product_id');
 
         return $products->map(function ($p) use ($allPrices) {
-            unset($p->price);
-            $p->prices = isset($allPrices[$p->id])
-                ? $allPrices[$p->id]->pluck('price')->map(fn($v) => (float) $v)->values()->toArray()
-                : [];
+            $hasSpecialPrice = isset($p->special_price) && $p->special_price !== null;
+            $specialPrice = (float) $p->price;
+            unset($p->price, $p->special_price);
+
+            if ($hasSpecialPrice) {
+                $p->prices = [$specialPrice];
+            } else {
+                $p->prices = isset($allPrices[$p->id])
+                    ? $allPrices[$p->id]->pluck('price')->map(fn($v) => (float) $v)->values()->toArray()
+                    : [];
+            }
             return $p;
         });
     }
