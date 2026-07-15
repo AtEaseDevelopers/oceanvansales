@@ -223,6 +223,36 @@ class AutocountSyncTest extends TestCase
     }
 
     /** @test */
+    public function companies_endpoint_lists_selectable_companies()
+    {
+        // The plugin fetches this list so the user can toggle which account book
+        // (company) to sync, instead of hardcoding COMPANY_CODE in .env.
+        $this->makeCompany(2, 'OS');
+        $this->makeCompany(1, 'OC');
+
+        $this->getJson('/api/autocount/companies')
+            ->assertStatus(200)
+            ->assertJsonCount(2)
+            // Ordered by code for a stable toggle list.
+            ->assertJsonPath('0.code', 'OC')
+            ->assertJsonPath('0.name', 'OC Branch')
+            ->assertJsonPath('1.code', 'OS');
+    }
+
+    /** @test */
+    public function companies_endpoint_skips_companies_without_a_code()
+    {
+        $this->makeCompany(1, 'OC');
+        // A branch with no code cannot map to an account book, so it is not selectable.
+        DB::table('companies')->insert(['id' => 2, 'code' => null, 'name' => 'Draft Branch']);
+
+        $this->getJson('/api/autocount/companies')
+            ->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonPath('0.code', 'OC');
+    }
+
+    /** @test */
     public function synced_endpoint_marks_invoice_synced_with_docno()
     {
         $id = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED]);

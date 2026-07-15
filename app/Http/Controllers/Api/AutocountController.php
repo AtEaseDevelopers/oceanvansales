@@ -27,6 +27,30 @@ use Illuminate\Support\Facades\Log;
 class AutocountController extends Controller
 {
     /**
+     * GET /api/autocount/companies
+     * List the companies (account books) the plugin can sync into. The desktop plugin
+     * fetches this so the user can toggle the active company from inside AutoCount,
+     * instead of hardcoding COMPANY_CODE in a .env file. Only companies with a code
+     * are returned, since the code is what maps a branch to an AutoCount account book.
+     */
+    public function companies()
+    {
+        $companies = Company::whereNotNull('code')
+            ->where('code', '!=', '')
+            ->orderBy('code')
+            ->get(['code', 'name']);
+
+        $data = $companies->map(function (Company $company) {
+            return [
+                'code' => $company->code,
+                'name' => $company->name,
+            ];
+        })->values();
+
+        return response()->json($data);
+    }
+
+    /**
      * GET /api/autocount/invoices/queued?book={company_code}
      * Return the queued invoices for the account book (branch) the plugin is connected
      * to. When the book is missing or matches no branch we return nothing, so invoices
