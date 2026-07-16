@@ -85,6 +85,7 @@ Route::group(['prefix' => 'v1'], function () {
 // AutoCount desktop plugin sync endpoints.
 // The web queues invoices; the plugin polls `queued` and reports back synced/failed.
 Route::group(['prefix' => 'autocount'], function () {
+    Route::get('/companies', [App\Http\Controllers\Api\AutocountController::class, 'companies']);
     Route::get('/invoices/queued', [App\Http\Controllers\Api\AutocountController::class, 'queued']);
     Route::post('/invoices/{invoice}/synced', [App\Http\Controllers\Api\AutocountController::class, 'synced']);
     Route::post('/invoices/{invoice}/failed', [App\Http\Controllers\Api\AutocountController::class, 'failed']);
