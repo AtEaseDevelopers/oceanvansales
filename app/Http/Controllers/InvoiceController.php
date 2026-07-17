@@ -465,7 +465,9 @@ class InvoiceController extends AppBaseController
     /**
      * Queue the selected invoices for AutoCount sync.
      * The desktop plugin polls queued invoices and creates the Sales Invoice.
-     * Already-synced invoices are skipped so we never duplicate a document.
+     * Already-synced invoices may be re-queued (resync) — e.g. the document was deleted
+     * or edited in AutoCount and needs to be pushed again. Re-queueing clears the stale
+     * sync metadata (docno/error/synced_at) so the plugin treats it as a fresh push.
      */
     public function queueAutocount(Request $request)
     {
@@ -476,10 +478,11 @@ class InvoiceController extends AppBaseController
         }
 
         $count = Invoice::whereIn('id', $ids)
-            ->where('autocount_status', '!=', Invoice::AUTOCOUNT_SYNCED)
             ->update([
-                'autocount_status' => Invoice::AUTOCOUNT_QUEUED,
-                'autocount_error'  => null,
+                'autocount_status'    => Invoice::AUTOCOUNT_QUEUED,
+                'autocount_docno'     => null,
+                'autocount_error'     => null,
+                'autocount_synced_at' => null,
             ]);
 
         return response()->json([
