@@ -35,8 +35,10 @@ class CompanyDataTable extends DataTable
             ->with('group')
             ->select('companies.*');
 
-        if (!Auth::user()->is_super_admin) {
-            $query->where('id', Auth::user()->company_id);
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+
+        if ($companyId !== null) {
+            $query->where('id', $companyId);
         }
 
         return $query;
