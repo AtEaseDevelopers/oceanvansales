@@ -118,15 +118,27 @@ class AutocountSyncTest extends TestCase
     }
 
     /** @test */
-    public function queue_autocount_skips_already_synced_invoices()
+    public function queue_autocount_allows_resyncing_an_already_synced_invoice()
     {
-        $synced = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_SYNCED]);
+        // A synced invoice can be re-queued (e.g. it was deleted/edited in AutoCount and
+        // needs to be pushed again). Re-queueing resets it to QUEUED and clears stale
+        // sync metadata so the plugin picks it up on the next tick.
+        $synced = $this->makeInvoice([
+            'autocount_status'    => Invoice::AUTOCOUNT_SYNCED,
+            'autocount_docno'     => 'OS2607/00001',
+            'autocount_error'     => null,
+            'autocount_synced_at' => now(),
+        ]);
 
         $response = $this->withoutMiddleware()
             ->postJson('/invoices/queue-autocount', ['ids' => [$synced]]);
 
-        $response->assertStatus(200)->assertJson(['count' => 0]);
-        $this->assertEquals(Invoice::AUTOCOUNT_SYNCED, DB::table('invoices')->find($synced)->autocount_status);
+        $response->assertStatus(200)->assertJson(['count' => 1]);
+
+        $row = DB::table('invoices')->find($synced);
+        $this->assertEquals(Invoice::AUTOCOUNT_QUEUED, $row->autocount_status);
+        $this->assertNull($row->autocount_docno);
+        $this->assertNull($row->autocount_synced_at);
     }
 
     /** @test */

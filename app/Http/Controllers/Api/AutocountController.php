@@ -85,12 +85,17 @@ class AutocountController extends Controller
             $details = InvoiceDetail::where('invoice_id', $invoice->id)->get()->map(function ($detail) {
                 $product = Product::find($detail->product_id);
 
-                // Invoice items are NOT synced to AutoCount: lines are pushed as free
-                // description lines only (no item code), so just the display/amount fields.
+                // Push the product master alongside the line so the plugin can create the
+                // stock item in AutoCount (when missing) and post a real item line — this
+                // is what makes the item code appear on the AutoCount invoice detail.
                 return [
-                    'description' => $detail->remark ?: ($product->name ?? ''),
-                    'quantity'    => $detail->quantity,
-                    'unit_price'  => $detail->price,
+                    'item_code'           => $product->code ?? null,
+                    'item_name'           => $product->name ?? null,
+                    'item_price'          => $product->price ?? null,
+                    'classification_code' => $product->classification_code ?? null,
+                    'description'         => $detail->remark ?: ($product->name ?? ''),
+                    'quantity'            => $detail->quantity,
+                    'unit_price'          => $detail->price,
                 ];
             })->values();
 
