@@ -147,7 +147,7 @@ class InvoiceDataTable extends DataTable
                     ],
                     [
                     'targets' => 9,
-                    'render' => 'function(data, type){return data == 1 ? "Completed" : "New";}'
+                    'render' => 'function(data, type){var map = {1:"Completed",2:"Cancelled"}; return map[data] || "New";}'
                     ],
                     [
                     'targets' => 10,
@@ -172,7 +172,7 @@ class InvoiceDataTable extends DataTable
                         var column = this;
                         if(columns[index].searchable){
                             if(columns[index].title == \'Status\'){
-                                var input = \'<select class="border-0" style="width: 100%;"><option value="1">Completed</option><option value="0">New</option></select>\';
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="1">Completed</option><option value="2">Cancelled</option></select>\';
                             }else if(columns[index].title == \'Payment Term\'){
                                 var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="1">Cash</option><option value="2">Credit</option><option value="3">Online BankIn</option><option value="4">E-wallet</option><option value="5">Cheque</option></select>\';
                             }else if(columns[index].title == \'Date\'){
@@ -241,7 +241,8 @@ class InvoiceDataTable extends DataTable
             'agent_id' => new \Yajra\DataTables\Html\Column([
                 'title' => trans('invoices.agent'),
                 'data' => 'agent.name',
-                'name' => 'agent.name'
+                'name' => 'agent.name',
+                'visible' => false
             ]),
 
             // 'supervisor_id' => new \Yajra\DataTables\Html\Column([

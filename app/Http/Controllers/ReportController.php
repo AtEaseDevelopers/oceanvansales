@@ -37,6 +37,7 @@ use App\Models\Company;
 use App\Exports\SellerInformationExport;
 use App\Exports\MonthlySaleReport;
 use App\Exports\DailySaleReportExport;
+use App\Exports\LorryMonthlySalesProductExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
@@ -887,11 +888,11 @@ class ReportController extends AppBaseController
 
     public function dailySalesForm()
     {
-        $drivers      = Driver::orderBy('name')->get();
+        $lorries      = Lorry::orderBy('lorryno')->get();
         $customers    = Customer::orderBy('company')->get();
         $paymentTerms = Customer::PAYMENT_TERMS;
         $reportType   = 'daily_sales';
-        return view('reports.report_filters', compact('drivers', 'customers', 'paymentTerms', 'reportType'));
+        return view('reports.report_filters', compact('lorries', 'customers', 'paymentTerms', 'reportType'));
     }
 
     public function dailySalesPdf(Request $request)
@@ -903,7 +904,7 @@ class ReportController extends AppBaseController
 
         $dateFrom    = $request->date_from;
         $dateTo      = $request->date_to;
-        $driverId    = $request->driver_id    ?: null;
+        $lorryId     = $request->lorry_id     ?: null;
         $customerId  = $request->customer_id  ?: null;
         $paymentType = $request->payment_type ?: null;
 
@@ -911,7 +912,7 @@ class ReportController extends AppBaseController
             ->where('status', 1)
             ->with(['customer', 'driver', 'invoicedetail.product']);
 
-        if ($driverId)    $query->where('driver_id', $driverId);
+        if ($lorryId)     $query->whereHas('driver', fn($q) => $q->where('lorry_id', $lorryId));
         if ($customerId)  $query->where('customer_id', $customerId);
         if ($paymentType) $query->where('paymentterm', $paymentType);
 
@@ -927,7 +928,7 @@ class ReportController extends AppBaseController
         }
         $grandTotal = array_sum($breakdown);
 
-        $filterDriver   = $driverId    ? (Driver::find($driverId)?->name ?? 'All')   : 'All';
+        $filterLorry    = $lorryId     ? (Lorry::find($lorryId)?->lorryno ?? 'All')  : 'All';
         $filterCustomer = $customerId  ? (Customer::find($customerId)?->company ?? 'All') : 'All';
         $filterPayment  = $paymentType ? ($paymentLabels[$paymentType] ?? 'All')      : 'All';
 
@@ -935,7 +936,7 @@ class ReportController extends AppBaseController
 
         $pdf = Pdf::loadView('reports.daily_sales_pdf', compact(
             'invoices', 'breakdown', 'grandTotal', 'paymentLabels',
-            'dateFrom', 'dateTo', 'filterDriver', 'filterCustomer', 'filterPayment', 'company'
+            'dateFrom', 'dateTo', 'filterLorry', 'filterCustomer', 'filterPayment', 'company'
         ))->setPaper('a4', 'landscape');
 
         return $pdf->stream('daily-sales-report-' . $dateFrom . '-to-' . $dateTo . '.pdf');
@@ -945,11 +946,11 @@ class ReportController extends AppBaseController
 
     public function customerPurchaseForm()
     {
-        $drivers      = Driver::orderBy('name')->get();
+        $lorries      = Lorry::orderBy('lorryno')->get();
         $customers    = Customer::orderBy('company')->get();
         $paymentTerms = Customer::PAYMENT_TERMS;
         $reportType   = 'customer_purchase';
-        return view('reports.report_filters', compact('drivers', 'customers', 'paymentTerms', 'reportType'));
+        return view('reports.report_filters', compact('lorries', 'customers', 'paymentTerms', 'reportType'));
     }
 
     public function customerPurchasePdf(Request $request)
@@ -963,7 +964,7 @@ class ReportController extends AppBaseController
         $dateFrom    = $request->date_from;
         $dateTo      = $request->date_to;
         $customerId  = $request->customer_id;
-        $driverId    = $request->driver_id    ?: null;
+        $lorryId     = $request->lorry_id     ?: null;
         $paymentType = $request->payment_type ?: null;
 
         $customer = Customer::findOrFail($customerId);
@@ -973,7 +974,7 @@ class ReportController extends AppBaseController
             ->where('customer_id', $customerId)
             ->with(['driver', 'invoicedetail.product']);
 
-        if ($driverId)    $query->where('driver_id', $driverId);
+        if ($lorryId)     $query->whereHas('driver', fn($q) => $q->where('lorry_id', $lorryId));
         if ($paymentType) $query->where('paymentterm', $paymentType);
 
         $invoices = $query->orderBy('date')->get();
@@ -997,17 +998,112 @@ class ReportController extends AppBaseController
         $monthlySummary = array_values($monthlyMap);
 
         $paymentLabels = Customer::PAYMENT_TERMS;
-        $filterDriver  = $driverId    ? (Driver::find($driverId)?->name ?? 'All')    : 'All';
+        $filterLorry   = $lorryId     ? (Lorry::find($lorryId)?->lorryno ?? 'All')   : 'All';
         $filterPayment = $paymentType ? ($paymentLabels[$paymentType] ?? 'All')       : 'All';
 
         $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
 
         $pdf = Pdf::loadView('reports.customer_purchase_pdf', compact(
             'customer', 'invoices', 'monthlySummary', 'paymentLabels',
-            'dateFrom', 'dateTo', 'filterDriver', 'filterPayment', 'company'
+            'dateFrom', 'dateTo', 'filterLorry', 'filterPayment', 'company'
         ))->setPaper('a4', 'portrait');
 
         return $pdf->stream('customer-purchase-' . str_replace(' ', '-', $customer->company) . '-' . $dateFrom . '-to-' . $dateTo . '.pdf');
+    }
+
+    // ── Lorry Monthly Sales Product Details Report ─────────────────────────────
+
+    public function lorryMonthlySalesForm()
+    {
+        $lorries = Lorry::orderBy('lorryno')->get();
+        return view('reports.lorry_monthly_sales_form', compact('lorries'));
+    }
+
+    public function lorryMonthlySalesExcel(Request $request)
+    {
+        $request->validate([
+            'date_from' => 'required|date',
+            'date_to'   => 'required|date|after_or_equal:date_from',
+            'lorry_id'  => 'nullable|integer|exists:lorrys,id',
+        ]);
+
+        $dateFrom = $request->date_from;
+        $dateTo   = $request->date_to;
+        $lorryId  = $request->lorry_id ?: null;
+
+        $lorries = $lorryId
+            ? Lorry::where('id', $lorryId)->orderBy('lorryno')->get()
+            : Lorry::orderBy('lorryno')->get();
+
+        $rows = collect();
+        $grandQty   = 0;
+        $grandTotal = 0;
+
+        foreach ($lorries as $lorry) {
+            $driverIds = Driver::where('lorry_id', $lorry->id)->pluck('id');
+            if ($driverIds->isEmpty()) {
+                continue;
+            }
+
+            $invoiceIds = Invoice::whereIn('driver_id', $driverIds)
+                ->where('status', 1)
+                ->whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
+                ->pluck('id');
+
+            if ($invoiceIds->isEmpty()) {
+                continue;
+            }
+
+            $productTotals = InvoiceDetail::whereIn('invoice_id', $invoiceIds)
+                ->selectRaw('product_id, SUM(quantity) as qty, SUM(totalprice) as total')
+                ->groupBy('product_id')
+                ->with('product')
+                ->get();
+
+            if ($productTotals->isEmpty()) {
+                continue;
+            }
+
+            foreach ($productTotals as $pt) {
+                $qty   = (float) $pt->qty;
+                $total = round((float) $pt->total, 2);
+                $rows->push([
+                    'lorry'      => $lorry->lorryno,
+                    'code'       => $pt->product->code ?? '',
+                    'name'       => $pt->product->name ?? 'Unknown',
+                    'qty'        => $qty,
+                    'unit_price' => $qty > 0 ? round($total / $qty, 2) : 0,
+                    'total'      => $total,
+                ]);
+            }
+
+            $lorryQty   = $productTotals->sum('qty');
+            $lorryTotal = round($productTotals->sum('total'), 2);
+            $rows->push([
+                'lorry'      => $lorry->lorryno . ' - TOTAL',
+                'code'       => '',
+                'name'       => '',
+                'qty'        => $lorryQty,
+                'unit_price' => '',
+                'total'      => $lorryTotal,
+            ]);
+
+            $grandQty   += $lorryQty;
+            $grandTotal += $lorryTotal;
+        }
+
+        $rows->push([
+            'lorry'      => 'GRAND TOTAL',
+            'code'       => '',
+            'name'       => '',
+            'qty'        => $grandQty,
+            'unit_price' => '',
+            'total'      => round($grandTotal, 2),
+        ]);
+
+        $filename = 'lorry-monthly-sales-product-' . $dateFrom . '-to-' . $dateTo . '.xlsx';
+
+        return Excel::download(new LorryMonthlySalesProductExport($rows), $filename);
     }
 
 }

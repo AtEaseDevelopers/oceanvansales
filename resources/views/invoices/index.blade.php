@@ -139,8 +139,8 @@
                     Completed: function() {
                         massupdatestatus(window.checkboxid,1);
                     },
-                    New: function() {
-                        massupdatestatus(window.checkboxid,0);
+                    Cancelled: function() {
+                        massupdatestatus(window.checkboxid,2);
                     },
                     somethingElse: {
                         text: 'Cancel',

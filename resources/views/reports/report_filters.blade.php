@@ -65,15 +65,15 @@
                                         </select>
                                     </div>
 
-                                    {{-- Driver --}}
+                                    {{-- Lorry --}}
                                     <div class="form-group col-sm-6">
-                                        <label>Driver <span class="text-muted small">(optional)</span></label>
-                                        <select name="driver_id" class="form-control select2-driver">
-                                            <option value="">— All Drivers —</option>
-                                            @foreach($drivers as $driver)
-                                                <option value="{{ $driver->id }}"
-                                                    {{ old('driver_id') == $driver->id ? 'selected' : '' }}>
-                                                    {{ $driver->name }}
+                                        <label>Lorry <span class="text-muted small">(optional)</span></label>
+                                        <select name="lorry_id" class="form-control select2-lorry">
+                                            <option value="">— All Lorries —</option>
+                                            @foreach($lorries as $lorry)
+                                                <option value="{{ $lorry->id }}"
+                                                    {{ old('lorry_id') == $lorry->id ? 'selected' : '' }}>
+                                                    {{ $lorry->lorryno }}
                                                 </option>
                                             @endforeach
                                         </select>
@@ -117,7 +117,7 @@
 <script>
 $(document).ready(function () {
     $('.select2-customer').select2({ placeholder: 'Search customer...', allowClear: true, width: '100%' });
-    $('.select2-driver').select2({ placeholder: 'Search driver...', allowClear: true, width: '100%' });
+    $('.select2-lorry').select2({ placeholder: 'Search lorry...', allowClear: true, width: '100%' });
     HideLoad();
 });
 </script>

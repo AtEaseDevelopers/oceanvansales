@@ -292,6 +292,8 @@ Route::group(['middleware' => ['auth']], function() {
         Route::post('/reports/daily-sales/pdf',        [App\Http\Controllers\ReportController::class, 'dailySalesPdf'])->name('reports.daily-sales.pdf');
         Route::get('/reports/customer-purchase',       [App\Http\Controllers\ReportController::class, 'customerPurchaseForm'])->name('reports.customer-purchase');
         Route::post('/reports/customer-purchase/pdf',  [App\Http\Controllers\ReportController::class, 'customerPurchasePdf'])->name('reports.customer-purchase.pdf');
+        Route::get('/reports/lorry-monthly-sales',            [App\Http\Controllers\ReportController::class, 'lorryMonthlySalesForm'])->name('reports.lorry-monthly-sales');
+        Route::post('/reports/lorry-monthly-sales/excel',      [App\Http\Controllers\ReportController::class, 'lorryMonthlySalesExcel'])->name('reports.lorry-monthly-sales.excel');
 
         Route::resource('reports', App\Http\Controllers\ReportController::class);
         Route::post('/reports/run', [App\Http\Controllers\ReportController::class, 'run']);

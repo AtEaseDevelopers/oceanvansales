@@ -31,9 +31,10 @@
     .text-right { text-align: right; }
     .text-center { text-align: center; }
 
-    .detail-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    .detail-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 6px; }
     .detail-table th { background: #e8e8e8; color: #000; padding: 5px 6px; text-align: left; font-size: 10px; }
     .detail-table td { padding: 4px 6px; border: 1px solid #ddd; font-size: 10px; vertical-align: top; }
+    .invoice-block { page-break-inside: avoid; }
 
     .mt-10 { margin-top: 10px; }
     .footer { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 8px; text-align: center; font-size: 9px; color: #888; }
@@ -69,7 +70,7 @@
 
 {{-- Active Filters --}}
 <div class="filter-bar">
-    <span><strong>Driver:</strong> {{ $filterDriver }}</span>
+    <span><strong>Lorry:</strong> {{ $filterLorry }}</span>
     <span><strong>Payment:</strong> {{ $filterPayment }}</span>
 </div>
 
@@ -112,29 +113,43 @@
     </tbody>
 </table>
 
+@php
+    $detailColgroup = '
+        <colgroup>
+            <col style="width:11%"><col style="width:11%"><col style="width:10%"><col style="width:10%">
+            <col style="width:33%"><col style="width:7%"><col style="width:8%"><col style="width:10%">
+        </colgroup>
+    ';
+@endphp
+
 {{-- Product Detail --}}
 <div class="section-label mt-10">Product Purchase Detail</div>
 <table class="detail-table">
+    {!! $detailColgroup !!}
     <thead>
         <tr>
-            <th style="width:11%">Invoice No</th>
-            <th style="width:11%">Date</th>
-            <th style="width:10%">Driver</th>
-            <th style="width:10%">Payment</th>
-            <th style="width:33%">Product</th>
-            <th style="width:7%">Qty</th>
-            <th style="width:8%">Price</th>
-            <th style="width:10%">Amount</th>
+            <th>Invoice No</th>
+            <th>Date</th>
+            <th>Driver</th>
+            <th>Payment</th>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Amount</th>
         </tr>
     </thead>
-    <tbody>
-        @forelse($invoices as $invoice)
-            @php
-                $paymentLabel = $paymentLabels[$invoice->paymentterm] ?? '-';
-                $firstItem = true;
-                $rowCount = $invoice->invoicedetail->count() ?: 1;
-                $invoiceTotal = $invoice->invoicedetail->sum('totalprice');
-            @endphp
+</table>
+
+@forelse($invoices as $invoice)
+    @php
+        $paymentLabel = $paymentLabels[$invoice->paymentterm] ?? '-';
+        $firstItem = true;
+        $rowCount = $invoice->invoicedetail->count() ?: 1;
+        $invoiceTotal = $invoice->invoicedetail->sum('totalprice');
+    @endphp
+    <table class="detail-table invoice-block">
+        {!! $detailColgroup !!}
+        <tbody>
             @forelse($invoice->invoicedetail as $detail)
             <tr>
                 @if($firstItem)
@@ -167,11 +182,16 @@
                 <td colspan="7" style="text-align:right;font-weight:bold;">Invoice Total:</td>
                 <td class="text-right" style="font-weight:bold;">{{ number_format($invoiceTotal, 2) }}</td>
             </tr>
-        @empty
+        </tbody>
+    </table>
+@empty
+    <table class="detail-table">
+        {!! $detailColgroup !!}
+        <tbody>
             <tr><td colspan="8" class="text-center" style="padding:12px;">No invoices found.</td></tr>
-        @endforelse
-    </tbody>
-</table>
+        </tbody>
+    </table>
+@endforelse
 
 <div class="footer">
     This report was generated automatically &mdash; {{ now()->format('d-m-Y H:i:s') }}

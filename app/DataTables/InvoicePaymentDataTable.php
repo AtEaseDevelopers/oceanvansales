@@ -146,15 +146,8 @@ class InvoicePaymentDataTable extends DataTable
                     [
                         'targets' => 7,
                          'render' => 'function(data, type){
-                            if (data == 0) {
-                                return "New";
-                            } else if (data == 1) {
-                                return "Completed";
-                            } else if (data == 2) {
-                                return "Canceled";
-                            } else {
-                                return "Unknown";
-                            }
+                            var map = {1:"Completed",2:"Canceled"};
+                            return map[data] || "Unknown";
                         }'
                     ],
                     [
@@ -177,7 +170,7 @@ class InvoicePaymentDataTable extends DataTable
                         var column = this;
                         if(columns[index].searchable){
                             if(columns[index].title == \'Status\'){
-                                var input = \'<select class="border-0" style="width: 100%;"><option value="1">Completed</option><option value="0">New</option><option value="2">Canceled</option></select>\';
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="1">Completed</option><option value="2">Canceled</option></select>\';
                             }else if(columns[index].title == \'Type\'){
                                 var input = \'<select class="border-0" style="width: 100%;"><option value=""></option>' . collect(Customer::PAYMENT_TERMS)->map(fn($label, $value) => '<option value="' . e($value) . '">' . e($label) . '</option>')->implode('') . '</select>\';
                             }else if(columns[index].title == \'Approve At\'){

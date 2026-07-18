@@ -26,11 +26,12 @@
     .summary-table .total-row td { font-weight: bold; background: #e8e8e8; border-top: 2px solid #333; }
     .text-right { text-align: right; }
 
-    .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+    .invoice-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin-bottom: 6px; }
     .invoice-table th { background: #e8e8e8; color: #000; padding: 5px 6px; text-align: left; font-size: 10px; }
     .invoice-table td { padding: 4px 6px; border: 1px solid #ddd; font-size: 10px; vertical-align: top; }
     .invoice-table .item-row td { background: #fff; }
     .invoice-table .inv-total td { background: #f0f0f0; font-weight: bold; }
+    .invoice-block { page-break-inside: avoid; }
 
     .mt-10 { margin-top: 10px; }
     .footer { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 8px; text-align: center; font-size: 9px; color: #888; }
@@ -56,7 +57,7 @@
 
 {{-- Active Filters --}}
 <div class="filter-bar">
-    <span><strong>Driver:</strong> {{ $filterDriver }}</span>
+    <span><strong>Lorry:</strong> {{ $filterLorry }}</span>
     <span><strong>Customer:</strong> {{ $filterCustomer }}</span>
     <span><strong>Payment:</strong> {{ $filterPayment }}</span>
 </div>
@@ -84,30 +85,45 @@
     </tbody>
 </table>
 
+@php
+    $invoiceColgroup = '
+        <colgroup>
+            <col style="width:11%"><col style="width:10%"><col style="width:14%">
+            <col style="width:10%"><col style="width:10%"><col style="width:25%">
+            <col style="width:7%"><col style="width:6%"><col style="width:7%">
+        </colgroup>
+    ';
+@endphp
+
 {{-- Invoice Details --}}
 <div class="section-label mt-10">Invoice Details</div>
 <table class="invoice-table">
+    {!! $invoiceColgroup !!}
     <thead>
         <tr>
-            <th style="width:11%">Invoice No</th>
-            <th style="width:10%">Date</th>
-            <th style="width:14%">Customer</th>
-            <th style="width:10%">Driver</th>
-            <th style="width:10%">Payment</th>
-            <th style="width:25%">Item</th>
-            <th style="width:7%">Qty</th>
-            <th style="width:6%">Price</th>
-            <th style="width:7%">Amount</th>
+            <th>Invoice No</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Driver</th>
+            <th>Payment</th>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Amount</th>
         </tr>
     </thead>
-    <tbody>
-        @forelse($invoices as $invoice)
-            @php
-                $invoiceTotal = $invoice->invoicedetail->sum('totalprice');
-                $paymentLabel = $paymentLabels[$invoice->paymentterm] ?? '-';
-                $firstItem = true;
-                $rowCount = $invoice->invoicedetail->count() ?: 1;
-            @endphp
+</table>
+
+@forelse($invoices as $invoice)
+    @php
+        $invoiceTotal = $invoice->invoicedetail->sum('totalprice');
+        $paymentLabel = $paymentLabels[$invoice->paymentterm] ?? '-';
+        $firstItem = true;
+        $rowCount = $invoice->invoicedetail->count() ?: 1;
+    @endphp
+    <table class="invoice-table invoice-block">
+        {!! $invoiceColgroup !!}
+        <tbody>
             @forelse($invoice->invoicedetail as $detail)
             <tr class="item-row">
                 @if($firstItem)
@@ -142,11 +158,16 @@
                 <td colspan="8" style="text-align:right;font-weight:bold;">Invoice Total:</td>
                 <td class="text-right">{{ number_format($invoiceTotal, 2) }}</td>
             </tr>
-        @empty
+        </tbody>
+    </table>
+@empty
+    <table class="invoice-table">
+        {!! $invoiceColgroup !!}
+        <tbody>
             <tr><td colspan="9" style="text-align:center;padding:12px;">No invoices found for this period.</td></tr>
-        @endforelse
-    </tbody>
-</table>
+        </tbody>
+    </table>
+@endforelse
 
 <div class="footer">
     This report was generated automatically &mdash; {{ now()->format('d-m-Y H:i:s') }}

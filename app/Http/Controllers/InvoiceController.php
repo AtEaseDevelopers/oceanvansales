@@ -76,6 +76,7 @@ class InvoiceController extends AppBaseController
         $input = $request->all();
 
         $input['date'] = date_create($input['date']);
+        $input['status'] = 1;
         if($input['invoiceno'] == null){
             $input['invoiceno'] = Invoice::generateInvoiceNo();
         }
@@ -187,7 +188,8 @@ class InvoiceController extends AppBaseController
         }
     
         $old_payment = $invoice['paymentterm'];
-        
+        $old_status = $invoice['status'];
+
         $input = $request->all();
 
         $input['date'] = date_create($input['date']);
@@ -203,6 +205,16 @@ class InvoiceController extends AppBaseController
         }
 
         $invoice = $this->invoiceRepository->update($input, $id);
+
+        if($old_status != 2 && $input['status'] == 2)
+        {
+            // Invoice cancelled: cancel its related invoice payment(s) too
+            InvoicePayment::where('invoice_id', $id)->update([
+                'status' => 2,
+                'approve_by' => null,
+                'approve_at' => null,
+            ]);
+        }
 
          if($old_payment != $input['paymentterm'])
         {
@@ -458,6 +470,16 @@ class InvoiceController extends AppBaseController
         $status = $data['status'];
 
         $count = invoice::whereIn('id',$ids)->update(['status'=>$status]);
+
+        if($status == 2)
+        {
+            // Invoices cancelled: cancel their related invoice payment(s) too
+            InvoicePayment::whereIn('invoice_id', $ids)->update([
+                'status' => 2,
+                'approve_by' => null,
+                'approve_at' => null,
+            ]);
+        }
 
         return $count;
     }

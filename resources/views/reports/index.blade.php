@@ -63,6 +63,29 @@
                                     </div>
                                 </div>
 
+                                {{-- Lorry Monthly Sales Product Details Report --}}
+                                <div class="col-md-4 mb-4">
+                                    <div class="card h-100 shadow-sm" style="border-left: 4px solid #fd7e14;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-3">
+                                                <span class="fa-stack fa-lg mr-3" style="color:#fd7e14;">
+                                                    <i class="fa fa-circle fa-stack-2x"></i>
+                                                    <i class="fa fa-truck fa-stack-1x fa-inverse"></i>
+                                                </span>
+                                                <h5 class="mb-0">Lorry Sales Product Details</h5>
+                                            </div>
+                                            <p class="text-muted small">
+                                                Product-level sales breakdown per lorry for a date range — quantity, unit price and total sales. Excel export.
+                                            </p>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-0">
+                                            <a href="{{ route('reports.lorry-monthly-sales') }}" class="btn btn-sm" style="background-color:#fd7e14; color:#fff;">
+                                                <i class="fa fa-arrow-right"></i> Open Report
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>

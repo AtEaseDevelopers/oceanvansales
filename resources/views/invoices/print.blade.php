@@ -232,14 +232,6 @@
                             <p class="ta-r" style="font-size:18px;">RM{{ number_format($totalamount,2) }}</p>
                         </td>
                     </tr>
-                    <tr>
-                        <th>
-                            <p class="ta-l" style="font-size:18px;">Updated Credit</p>
-                        </th>
-                        <td>
-                            <p class="ta-r" style="font-size:18px;">RM{{ number_format($invoice->newcredit,2) }}</p>
-                        </td>
-                    </tr>
                 </table>
             </td>
         </tr>

@@ -4082,14 +4082,6 @@ class DriverController extends Controller
                                     <p class="ta-r" style="font-size:18px;">@totalAmount</p>
                                 </td>
                             </tr>
-                            <tr>
-                                <th>
-                                    <p class="ta-l" style="font-size:18px;">Updated Credit</p>
-                                </th>
-                                <td>
-                                    <p class="ta-r" style="font-size:18px;">@updatedCredit</p>
-                                </td>
-                            </tr>
                         </table>
                     </td>
                 </tr>

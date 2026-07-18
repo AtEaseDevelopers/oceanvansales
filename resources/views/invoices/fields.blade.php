@@ -72,11 +72,15 @@
     {!! Form::text('chequeno', null, ['class' => 'form-control','maxlength' => 20,'maxlength' => 20]) !!}
 </div>
 
+@if(isset($invoice))
 <!-- Status Field -->
 <div class="form-group col-sm-6">
     {!! Form::label('status',  __('invoices.status'))  !!}<span class="asterisk"> *</span>
-    {{ Form::select('status', array(0 => 'New' , 1 => 'Completed'), null, ['class' => 'form-control']) }}
+    {{ Form::select('status', array(1 => 'Completed', 2 => 'Cancelled'), null, ['class' => 'form-control']) }}
 </div>
+@else
+    {{ Form::hidden('status', 1) }}
+@endif
 
 <!-- Remark Field -->
 <div class="form-group col-sm-6">

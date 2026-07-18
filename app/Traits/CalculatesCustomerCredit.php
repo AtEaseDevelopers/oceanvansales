@@ -19,7 +19,7 @@ trait CalculatesCustomerCredit
             ->where('invoices.customer_id', $customerId)
             ->where('invoices.company_id', $companyId)
             ->where('invoices.status', 1)
-            ->where('invoices.updated_at', '<=', $date)
+            ->where('invoices.date', '<=', $date)
             ->sum('invoice_details.totalprice') ?: 0;
 
         $totalPaid = DB::table('invoice_payments')
