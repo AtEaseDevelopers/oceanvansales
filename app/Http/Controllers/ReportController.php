@@ -1035,7 +1035,7 @@ class ReportController extends AppBaseController
             ? Lorry::where('id', $lorryId)->orderBy('lorryno')->get()
             : Lorry::orderBy('lorryno')->get();
 
-        $rows = collect();
+        $blocks     = collect();
         $grandQty   = 0;
         $grandTotal = 0;
 
@@ -1064,46 +1064,37 @@ class ReportController extends AppBaseController
                 continue;
             }
 
-            foreach ($productTotals as $pt) {
+            $products = $productTotals->map(function ($pt) {
                 $qty   = (float) $pt->qty;
                 $total = round((float) $pt->total, 2);
-                $rows->push([
-                    'lorry'      => $lorry->lorryno,
+                return [
                     'code'       => $pt->product->code ?? '',
                     'name'       => $pt->product->name ?? 'Unknown',
                     'qty'        => $qty,
                     'unit_price' => $qty > 0 ? round($total / $qty, 2) : 0,
                     'total'      => $total,
-                ]);
-            }
+                ];
+            })->values();
 
-            $lorryQty   = $productTotals->sum('qty');
-            $lorryTotal = round($productTotals->sum('total'), 2);
-            $rows->push([
-                'lorry'      => $lorry->lorryno . ' - TOTAL',
-                'code'       => '',
-                'name'       => '',
-                'qty'        => $lorryQty,
-                'unit_price' => '',
-                'total'      => $lorryTotal,
+            $lorryQty   = $products->sum('qty');
+            $lorryTotal = round($products->sum('total'), 2);
+
+            $blocks->push([
+                'lorry'    => $lorry->lorryno,
+                'products' => $products,
+                'qty'      => $lorryQty,
+                'total'    => $lorryTotal,
             ]);
 
             $grandQty   += $lorryQty;
             $grandTotal += $lorryTotal;
         }
 
-        $rows->push([
-            'lorry'      => 'GRAND TOTAL',
-            'code'       => '',
-            'name'       => '',
-            'qty'        => $grandQty,
-            'unit_price' => '',
-            'total'      => round($grandTotal, 2),
-        ]);
-
         $filename = 'lorry-monthly-sales-product-' . $dateFrom . '-to-' . $dateTo . '.xlsx';
 
-        return Excel::download(new LorryMonthlySalesProductExport($rows), $filename);
+        return Excel::download(new LorryMonthlySalesProductExport(
+            $blocks, $dateFrom, $dateTo, $grandQty, round($grandTotal, 2)
+        ), $filename);
     }
 
 }

@@ -2,42 +2,34 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\FromView;
+use Illuminate\Contracts\View\View;
 
-class LorryMonthlySalesProductExport implements FromCollection, WithHeadings, ShouldAutoSize
+class LorryMonthlySalesProductExport implements FromView
 {
-    protected $rows;
+    protected $blocks;
+    protected $dateFrom;
+    protected $dateTo;
+    protected $grandQty;
+    protected $grandTotal;
 
-    public function __construct($rows)
+    public function __construct($blocks, $dateFrom, $dateTo, $grandQty, $grandTotal)
     {
-        $this->rows = $rows;
+        $this->blocks     = $blocks;
+        $this->dateFrom   = $dateFrom;
+        $this->dateTo     = $dateTo;
+        $this->grandQty   = $grandQty;
+        $this->grandTotal = $grandTotal;
     }
 
-    public function collection()
+    public function view(): View
     {
-        return collect($this->rows)->map(function ($row) {
-            return [
-                'Lorry'       => $row['lorry'],
-                'Product Code' => $row['code'],
-                'Product Name' => $row['name'],
-                'Qty'         => $row['qty'],
-                'Unit Price (RM)' => $row['unit_price'],
-                'Total Sales (RM)' => $row['total'],
-            ];
-        });
-    }
-
-    public function headings(): array
-    {
-        return [
-            'Lorry',
-            'Product Code',
-            'Product Name',
-            'Qty',
-            'Unit Price (RM)',
-            'Total Sales (RM)',
-        ];
+        return view('exports.lorry_monthly_sales_product', [
+            'blocks'     => $this->blocks,
+            'dateFrom'   => $this->dateFrom,
+            'dateTo'     => $this->dateTo,
+            'grandQty'   => $this->grandQty,
+            'grandTotal' => $this->grandTotal,
+        ]);
     }
 }
