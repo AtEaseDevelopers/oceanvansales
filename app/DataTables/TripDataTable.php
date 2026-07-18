@@ -21,10 +21,23 @@ class TripDataTable extends DataTable
 
       return $dataTable->addColumn('action', function ($row) {
         if ($row->type == 2) {
+            $images = [];
+            foreach (($row->diesel_images ?? []) as $path) $images[] = ['label' => 'Diesel', 'url' => asset('storage/' . $path)];
+            foreach (($row->tol_images    ?? []) as $path) $images[] = ['label' => 'Toll',   'url' => asset('storage/' . $path)];
+            foreach (($row->others_images ?? []) as $path) $images[] = ['label' => 'Others', 'url' => asset('storage/' . $path)];
+
+            $imageBtn = '';
+            if (!empty($images)) {
+                $imageBtn = '<button type="button" class="btn btn-sm btn-info btn-trip-images" data-images=\'' . htmlspecialchars(json_encode($images), ENT_QUOTES, 'UTF-8') . '\'>
+                                <i class="fa fa-image"></i> Image
+                            </button>';
+            }
+
             return '<div class="btn-group">
                         <a href="' . route('trips.report', Crypt::encrypt($row->id)) . '" target="_blank" class="btn btn-sm btn-primary">
                             <i class="fa fa-file-pdf-o"></i> Report
                         </a>
+                        ' . $imageBtn . '
                     </div>';
         } else {
             return '';

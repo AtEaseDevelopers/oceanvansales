@@ -28,7 +28,13 @@ class Trip extends Model
         'lorry_id',
         'cash',
         'type',
-        'stock_snapshot'
+        'stock_snapshot',
+        'diesel',
+        'diesel_images',
+        'tol',
+        'tol_images',
+        'others',
+        'others_images'
     ];
 
     /**
@@ -44,7 +50,13 @@ class Trip extends Model
         'lorry_id' => 'integer',
         'cash' => 'float',
         'type' => 'integer',
-        'stock_snapshot' => 'array'
+        'stock_snapshot' => 'array',
+        'diesel' => 'float',
+        'diesel_images' => 'array',
+        'tol' => 'float',
+        'tol_images' => 'array',
+        'others' => 'float',
+        'others_images' => 'array'
     ];
 
     /**

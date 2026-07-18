@@ -105,6 +105,16 @@
             @endif
         </td>
     </tr>
+    <tr>
+        <td class="label">Diesel (RM)</td>
+        <td>{{ $endTrip->diesel !== null ? number_format($endTrip->diesel, 2) : '-' }}</td>
+        <td class="label">Toll (RM)</td>
+        <td>{{ $endTrip->tol !== null ? number_format($endTrip->tol, 2) : '-' }}</td>
+    </tr>
+    <tr>
+        <td class="label">Others (RM)</td>
+        <td colspan="3">{{ $endTrip->others !== null ? number_format($endTrip->others, 2) : '-' }}</td>
+    </tr>
 </table>
 
 {{-- Payment Summary --}}

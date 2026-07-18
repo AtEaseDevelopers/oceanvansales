@@ -525,8 +525,15 @@ class DriverController extends Controller
             $validator = Validator::make($request->all(), [
                 'kelindan_id' => 'nullable|numeric',
                 'lorry_id' => 'required|numeric',
-                'cash' => 'required|numeric',
-                'advance_amount' => 'nullable|numeric',
+                'diesel' => 'nullable|numeric',
+                'diesel_images' => 'nullable|array',
+                'diesel_images.*' => 'string',
+                'tol' => 'nullable|numeric',
+                'tol_images' => 'nullable|array',
+                'tol_images.*' => 'string',
+                'others' => 'nullable|numeric',
+                'others_images' => 'nullable|array',
+                'others_images.*' => 'string',
                 'wastage' => 'present|array',
                 'wastage.*.product_id' => 'required|numeric',
                 'wastage.*.quantity' => 'required|numeric'
@@ -538,19 +545,23 @@ class DriverController extends Controller
                     'data' => null
                 ], 400);
             }
-            // $kelindan = Kelindan::where('id', $data['kelindan_id'])->first();
-            // if(empty($kelindan)){
-            //     return response()->json([
-            //         'result' => false,
-            //         'message' => __LINE__.$this->message_separator.'Invalid Kelindan',
-            //         'data' => null
-            //     ], 400);
-            // }
             $lorry = Lorry::where('id', $data['lorry_id'])->first();
             if(empty($lorry)){
                 return response()->json([
                     'result' => false,
                     'message' => __LINE__.$this->message_separator.'Invalid Lorry',
+                    'data' => null
+                ], 400);
+            }
+            //decode any base64 images up front so bad image data fails before we touch the DB
+            try {
+                $dieselImages = $this->storeBase64Images($data['diesel_images'] ?? [], 'trips-attachments');
+                $tolImages    = $this->storeBase64Images($data['tol_images']    ?? [], 'trips-attachments');
+                $othersImages = $this->storeBase64Images($data['others_images'] ?? [], 'trips-attachments');
+            } catch (\InvalidArgumentException $e) {
+                return response()->json([
+                    'result' => false,
+                    'message' => __LINE__.$this->message_separator.$e->getMessage(),
                     'data' => null
                 ], 400);
             }
@@ -570,8 +581,12 @@ class DriverController extends Controller
                     $newtrip->driver_id = $driver->id;
                     $newtrip->kelindan_id = $data['kelindan_id'];
                     $newtrip->lorry_id = $data['lorry_id'];
-                    $newtrip->cash = $data['cash'];
-                    $newtrip->advance_amount = $data['advance_amount'] ?? 0;
+                    $newtrip->diesel = $data['diesel'] ?? null;
+                    $newtrip->tol = $data['tol'] ?? null;
+                    $newtrip->others = $data['others'] ?? null;
+                    $newtrip->diesel_images = $dieselImages;
+                    $newtrip->tol_images = $tolImages;
+                    $newtrip->others_images = $othersImages;
                     $newtrip->type = 2;
                     $newtrip->date = date("Y-m-d H:i:s");
                     $newtrip->save();
@@ -4092,6 +4107,38 @@ class DriverController extends Controller
         HTML;
 
         return \Blade::render($html, ['company' => $company]);
+    }
+
+    /**
+     * Decode an array of base64 image strings (optionally prefixed with a
+     * data: URI header) and store each one to the public disk.
+     *
+     * @throws \InvalidArgumentException if any entry is not valid image data
+     */
+    private function storeBase64Images(array $base64Images, string $directory): array
+    {
+        $paths = [];
+        foreach ($base64Images as $base64Image) {
+            if (empty($base64Image)) {
+                continue;
+            }
+
+            $extension = 'jpg';
+            if (preg_match('/^data:image\/(\w+);base64,/', $base64Image, $matches)) {
+                $extension = $matches[1] === 'jpeg' ? 'jpg' : $matches[1];
+                $base64Image = substr($base64Image, strpos($base64Image, ',') + 1);
+            }
+
+            $decoded = base64_decode($base64Image, true);
+            if ($decoded === false || @getimagesizefromstring($decoded) === false) {
+                throw new \InvalidArgumentException('Invalid image data provided');
+            }
+
+            $filename = $directory . '/' . uniqid('', true) . '.' . $extension;
+            Storage::disk('public')->put($filename, $decoded);
+            $paths[] = $filename;
+        }
+        return $paths;
     }
 
     private function appendProductPrices($products, $companyId = null)
