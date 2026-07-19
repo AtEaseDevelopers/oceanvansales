@@ -3,9 +3,6 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
-use App\Models\Customer;
-use Illuminate\Support\Facades\Crypt;
 use App\Services\EInvoiceService;
 
 class UpdateCustomerRequest extends FormRequest
@@ -24,12 +21,9 @@ class UpdateCustomerRequest extends FormRequest
 
     public function rules()
     {
-        $id = Crypt::decrypt($this->route('customer'));
         $rules = [
-            // Code must be globally unique (maps 1:1 to an AutoCount debtor AccNo).
-            'code' => ['required', 'string', 'max:255',
-                Rule::unique('customers', 'code')->ignore($id),
-            ],
+            // Code is intentionally not unique — duplicate codes across customers are allowed.
+            'code' => ['required', 'string', 'max:255'],
             'company' => 'required|string|max:255',
             'paymentterm' => 'required',
             'phone' => 'nullable|string|max:20',
