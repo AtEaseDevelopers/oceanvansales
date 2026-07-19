@@ -904,7 +904,7 @@ class ReportController extends AppBaseController
 
         $dateFrom    = $request->date_from;
         $dateTo      = $request->date_to;
-        $lorryId     = $request->lorry_id     ?: null;
+        $lorryIds    = array_filter($request->input('lorry_ids', []));
         $customerId  = $request->customer_id  ?: null;
         $paymentType = $request->payment_type ?: null;
 
@@ -912,9 +912,9 @@ class ReportController extends AppBaseController
             ->where('status', 1)
             ->with(['customer', 'driver', 'invoicedetail.product']);
 
-        if ($lorryId)     $query->whereHas('driver', fn($q) => $q->where('lorry_id', $lorryId));
-        if ($customerId)  $query->where('customer_id', $customerId);
-        if ($paymentType) $query->where('paymentterm', $paymentType);
+        if (!empty($lorryIds)) $query->whereHas('driver', fn($q) => $q->whereIn('lorry_id', $lorryIds));
+        if ($customerId)       $query->where('customer_id', $customerId);
+        if ($paymentType)      $query->where('paymentterm', $paymentType);
 
         $invoices = $query->orderBy('date')->get();
 
@@ -928,7 +928,7 @@ class ReportController extends AppBaseController
         }
         $grandTotal = array_sum($breakdown);
 
-        $filterLorry    = $lorryId     ? (Lorry::find($lorryId)?->lorryno ?? 'All')  : 'All';
+        $filterLorry    = !empty($lorryIds) ? (Lorry::whereIn('id', $lorryIds)->pluck('lorryno')->implode(', ') ?: 'All') : 'All';
         $filterCustomer = $customerId  ? (Customer::find($customerId)?->company ?? 'All') : 'All';
         $filterPayment  = $paymentType ? ($paymentLabels[$paymentType] ?? 'All')      : 'All';
 
@@ -964,7 +964,7 @@ class ReportController extends AppBaseController
         $dateFrom    = $request->date_from;
         $dateTo      = $request->date_to;
         $customerId  = $request->customer_id;
-        $lorryId     = $request->lorry_id     ?: null;
+        $lorryIds    = array_filter($request->input('lorry_ids', []));
         $paymentType = $request->payment_type ?: null;
 
         $customer = Customer::findOrFail($customerId);
@@ -974,8 +974,8 @@ class ReportController extends AppBaseController
             ->where('customer_id', $customerId)
             ->with(['driver', 'invoicedetail.product']);
 
-        if ($lorryId)     $query->whereHas('driver', fn($q) => $q->where('lorry_id', $lorryId));
-        if ($paymentType) $query->where('paymentterm', $paymentType);
+        if (!empty($lorryIds)) $query->whereHas('driver', fn($q) => $q->whereIn('lorry_id', $lorryIds));
+        if ($paymentType)      $query->where('paymentterm', $paymentType);
 
         $invoices = $query->orderBy('date')->get();
 
@@ -998,7 +998,7 @@ class ReportController extends AppBaseController
         $monthlySummary = array_values($monthlyMap);
 
         $paymentLabels = Customer::PAYMENT_TERMS;
-        $filterLorry   = $lorryId     ? (Lorry::find($lorryId)?->lorryno ?? 'All')   : 'All';
+        $filterLorry   = !empty($lorryIds) ? (Lorry::whereIn('id', $lorryIds)->pluck('lorryno')->implode(', ') ?: 'All') : 'All';
         $filterPayment = $paymentType ? ($paymentLabels[$paymentType] ?? 'All')       : 'All';
 
         $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
@@ -1022,17 +1022,18 @@ class ReportController extends AppBaseController
     public function lorryMonthlySalesExcel(Request $request)
     {
         $request->validate([
-            'date_from' => 'required|date',
-            'date_to'   => 'required|date|after_or_equal:date_from',
-            'lorry_id'  => 'nullable|integer|exists:lorrys,id',
+            'date_from'    => 'required|date',
+            'date_to'      => 'required|date|after_or_equal:date_from',
+            'lorry_ids'    => 'nullable|array',
+            'lorry_ids.*'  => 'integer|exists:lorrys,id',
         ]);
 
         $dateFrom = $request->date_from;
         $dateTo   = $request->date_to;
-        $lorryId  = $request->lorry_id ?: null;
+        $lorryIds = array_filter($request->input('lorry_ids', []));
 
-        $lorries = $lorryId
-            ? Lorry::where('id', $lorryId)->orderBy('lorryno')->get()
+        $lorries = !empty($lorryIds)
+            ? Lorry::whereIn('id', $lorryIds)->orderBy('lorryno')->get()
             : Lorry::orderBy('lorryno')->get();
 
         $blocks     = collect();

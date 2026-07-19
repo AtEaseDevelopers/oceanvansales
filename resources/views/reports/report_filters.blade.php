@@ -67,12 +67,11 @@
 
                                     {{-- Lorry --}}
                                     <div class="form-group col-sm-6">
-                                        <label>Lorry <span class="text-muted small">(optional)</span></label>
-                                        <select name="lorry_id" class="form-control select2-lorry">
-                                            <option value="">— All Lorries —</option>
+                                        <label>Lorry <span class="text-muted small">(optional — leave blank for all lorries)</span></label>
+                                        <select name="lorry_ids[]" class="form-control select2-lorry" multiple>
                                             @foreach($lorries as $lorry)
                                                 <option value="{{ $lorry->id }}"
-                                                    {{ old('lorry_id') == $lorry->id ? 'selected' : '' }}>
+                                                    {{ in_array($lorry->id, old('lorry_ids', [])) ? 'selected' : '' }}>
                                                     {{ $lorry->lorryno }}
                                                 </option>
                                             @endforeach
