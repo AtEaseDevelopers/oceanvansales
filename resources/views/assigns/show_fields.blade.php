@@ -1,13 +1,7 @@
-<!-- Driver Code Field -->
+<!-- Lorry Field -->
 <div class="form-group">
-    {!! Form::label('driver_id', __('assign.driver_code')) !!}:
-    <p>{{ $assign->driver->employeeid }}</p>
-</div>
-
-<!-- Driver Name Field -->
-<div class="form-group">
-    {!! Form::label('driver_id', __('assign.driver_name')) !!}:
-    <p>{{ $assign->driver->name }}</p>
+    {!! Form::label('lorry_id', __('assign.lorry')) !!}:
+    <p>{{ $assign->lorry->lorryno ?? '-' }}</p>
 </div>
 
 <!-- Customer Code Field -->
