@@ -3584,17 +3584,21 @@ class DriverController extends Controller
 
             // Always show the driver's last ended trip, regardless of whether a
             // new trip has since been started
-            $trip = Trip::where('driver_id', $driver->id)
+            $starttrip = Trip::where('driver_id', $driver->id)
                 ->where('type', 1)
                 ->orderBy('id', 'desc')
                 ->with(['kelindan:id,name', 'lorry:id,lorryno'])
                 ->first();
-
+            $endtrip = Trip::where('driver_id', $driver->id)
+                ->where('type', 2)
+                ->orderBy('id', 'desc')
+                ->with(['kelindan:id,name', 'lorry:id,lorryno'])
+                ->first();
             // Invoices are linked to the start trip's id, so find the start
             // trip that this end trip closed out to look up its sales
             $invoices = collect();
-            if($trip){
-                $invoices = Invoice::where('trip_id', $trip->id)
+            if($starttrip){
+                $invoices = Invoice::where('trip_id', $starttrip->id)
                     ->where('status', 1)
                     ->with('invoicedetail.product')
                     ->get();
@@ -3636,7 +3640,9 @@ class DriverController extends Controller
                 'ewallet'      => round($breakdown[4], 2),
                 'cheque'       => round($breakdown[5], 2),
                 'product_sold' => $productSold,
-                'trip'         => $trip,
+                'diesel'       => $endtrip->diesel ?? 0,
+                'tol'          => $endtrip->tol ?? 0,
+                'others'       => $endtrip->others ?? 0,
             ];
 
             return response()->json([
