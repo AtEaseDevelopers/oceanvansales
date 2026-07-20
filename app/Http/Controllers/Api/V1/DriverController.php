@@ -3582,7 +3582,8 @@ class DriverController extends Controller
                 ], 400);
             }
 
-            // Get current trip — must match driver->trip_id
+            // Get the current trip (driver->trip_id while a trip is active); if no
+            // trip is active right now, fall back to the driver's last trip on record
             $trip = null;
             if($driver->trip_id){
                 $trip = Trip::where('id', $driver->trip_id)
@@ -3590,11 +3591,18 @@ class DriverController extends Controller
                     ->with(['kelindan:id,name', 'lorry:id,lorryno'])
                     ->first();
             }
+            if(empty($trip)){
+                $trip = Trip::where('driver_id', $driver->id)
+                    ->where('type', 1)
+                    ->orderBy('date', 'desc')
+                    ->with(['kelindan:id,name', 'lorry:id,lorryno'])
+                    ->first();
+            }
 
-            // Get all completed invoices for the current trip
+            // Get all completed invoices for that trip
             $invoices = collect();
             if($trip){
-                $invoices = Invoice::where('trip_id', $driver->trip_id)
+                $invoices = Invoice::where('trip_id', $trip->id)
                     ->where('status', 1)
                     ->with('invoicedetail.product')
                     ->get();
@@ -3628,15 +3636,6 @@ class DriverController extends Controller
                 $productSold[] = ['name' => $name, 'quantity' => $qty];
             }
 
-            // FOC: only for customers assigned to this lorry
-            $assignedCustomerIds = Assign::where('lorry_id', $driver->lorry_id)->pluck('customer_id');
-            $productFoc = foc::whereIn('customer_id', $assignedCustomerIds)
-                ->where('status', 1)
-                ->where('startdate', '<=', date('Y-m-d H:i:s'))
-                ->where('enddate', '>', date('Y-m-d H:i:s'))
-                ->with(['customer:id,company', 'product:id,name', 'freeproduct:id,name'])
-                ->get();
-
             $result = [
                 'sales'        => round($sales, 2),
                 'cash'         => round($breakdown[1], 2),
@@ -3645,7 +3644,6 @@ class DriverController extends Controller
                 'ewallet'      => round($breakdown[4], 2),
                 'cheque'       => round($breakdown[5], 2),
                 'product_sold' => $productSold,
-                'product_foc'  => $productFoc,
                 'trip'         => $trip,
             ];
 
