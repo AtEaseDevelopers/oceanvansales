@@ -22,9 +22,9 @@ class TripDataTable extends DataTable
       return $dataTable->addColumn('action', function ($row) {
         if ($row->type == 2) {
             $images = [];
-            foreach (($row->diesel_images ?? []) as $path) $images[] = ['label' => 'Diesel', 'url' => asset('storage/' . $path)];
-            foreach (($row->tol_images    ?? []) as $path) $images[] = ['label' => 'Toll',   'url' => asset('storage/' . $path)];
-            foreach (($row->others_images ?? []) as $path) $images[] = ['label' => 'Others', 'url' => asset('storage/' . $path)];
+            foreach (($row->diesel_images ?? []) as $path) $images[] = ['label' => 'Diesel', 'url' =>  asset( $path)];
+            foreach (($row->tol_images    ?? []) as $path) $images[] = ['label' => 'Toll',   'url' =>  asset( $path)];
+            foreach (($row->others_images ?? []) as $path) $images[] = ['label' => 'Others', 'url' =>  asset( $path)];
 
             $imageBtn = '';
             if (!empty($images)) {
