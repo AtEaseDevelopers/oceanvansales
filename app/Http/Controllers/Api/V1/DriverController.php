@@ -3592,23 +3592,13 @@ class DriverController extends Controller
 
             // Invoices are linked to the start trip's id, so find the start
             // trip that this end trip closed out to look up its sales
-            $startTripForInvoices = null;
-            if($trip){
-                $startTripForInvoices = Trip::where('driver_id', $driver->id)
-                    ->where('type', 1)
-                    ->where('id', '<', $trip->id)
-                    ->orderBy('id', 'desc')
-                    ->first();
-            }
-
-            // Get all completed invoices for that trip
             $invoices = collect();
-            if($startTripForInvoices){
-                $invoices = Invoice::where('trip_id', $startTripForInvoices->id)
+            if($trip){
+                $invoices = Invoice::where('trip_id', $trip->id)
                     ->where('status', 1)
                     ->with('invoicedetail.product')
                     ->get();
-            }
+            }            
 
             // Aggregate sales and break down by payment term (1=Cash,2=Credit,3=Online BankIn,4=E-wallet,5=Cheque)
             $sales     = 0;
