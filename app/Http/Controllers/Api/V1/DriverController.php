@@ -3585,7 +3585,7 @@ class DriverController extends Controller
             // Always show the driver's last ended trip, regardless of whether a
             // new trip has since been started
             $trip = Trip::where('driver_id', $driver->id)
-                ->where('type', 2)
+                ->where('type', 1)
                 ->orderBy('id', 'desc')
                 ->with(['kelindan:id,name', 'lorry:id,lorryno'])
                 ->first();
