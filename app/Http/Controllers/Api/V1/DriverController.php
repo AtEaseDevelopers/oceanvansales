@@ -3582,27 +3582,29 @@ class DriverController extends Controller
                 ], 400);
             }
 
-            // Get the current trip (driver->trip_id while a trip is active); if no
-            // trip is active right now, fall back to the driver's last trip on record
-            $trip = null;
-            if($driver->trip_id){
-                $trip = Trip::where('id', $driver->trip_id)
-                    ->where('driver_id', $driver->id)
-                    ->with(['kelindan:id,name', 'lorry:id,lorryno'])
-                    ->first();
-            }
-            if(empty($trip)){
-                $trip = Trip::where('driver_id', $driver->id)
+            // Always show the driver's last ended trip, regardless of whether a
+            // new trip has since been started
+            $trip = Trip::where('driver_id', $driver->id)
+                ->where('type', 2)
+                ->orderBy('id', 'desc')
+                ->with(['kelindan:id,name', 'lorry:id,lorryno'])
+                ->first();
+
+            // Invoices are linked to the start trip's id, so find the start
+            // trip that this end trip closed out to look up its sales
+            $startTripForInvoices = null;
+            if($trip){
+                $startTripForInvoices = Trip::where('driver_id', $driver->id)
                     ->where('type', 1)
-                    ->orderBy('date', 'desc')
-                    ->with(['kelindan:id,name', 'lorry:id,lorryno'])
+                    ->where('id', '<', $trip->id)
+                    ->orderBy('id', 'desc')
                     ->first();
             }
 
             // Get all completed invoices for that trip
             $invoices = collect();
-            if($trip){
-                $invoices = Invoice::where('trip_id', $trip->id)
+            if($startTripForInvoices){
+                $invoices = Invoice::where('trip_id', $startTripForInvoices->id)
                     ->where('status', 1)
                     ->with('invoicedetail.product')
                     ->get();
