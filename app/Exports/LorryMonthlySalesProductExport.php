@@ -8,6 +8,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use Carbon\Carbon;
 
@@ -107,6 +108,7 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                     $row++;
 
                     // One row per day — Date column shows the day-of-month only
+                    $dataStartRow = $row;
                     foreach ($table['rows'] as $dayRow) {
                         $sheet->setCellValue("A{$row}", (int) Carbon::parse($dayRow['date'])->format('j'));
 
@@ -142,6 +144,10 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                     $secondColLtr = Coordinate::stringFromColumnIndex(2);
                     $sheet->getStyle("{$secondColLtr}{$headerRow}:{$lastColLtr}{$blockEnd}")
                         ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                    // TOTAL RM column always shows 2 decimal places
+                    $sheet->getStyle("{$lastColLtr}{$dataStartRow}:{$lastColLtr}{$blockEnd}")
+                        ->getNumberFormat()->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
 
                     // Border around this lorry's whole table
                     $sheet->getStyle("A{$blockStart}:{$lastColLtr}{$blockEnd}")
