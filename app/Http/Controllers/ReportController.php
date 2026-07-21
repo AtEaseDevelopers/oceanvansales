@@ -1037,11 +1037,11 @@ class ReportController extends AppBaseController
             ? Lorry::whereIn('id', $lorryIds)->orderBy('lorryno')->get()
             : Lorry::orderBy('lorryno')->get();
 
-        $blocks     = collect();
-        $grandQty   = 0;
-        $grandTotal = 0;
+        $days = collect(CarbonPeriod::create($dateFrom, $dateTo))
+            ->map(fn($d) => $d->format('Y-m-d'))
+            ->values();
 
-        $period = CarbonPeriod::create($dateFrom, $dateTo);
+        $tables = collect();
 
         foreach ($lorries as $lorry) {
             $driverIds = Driver::where('lorry_id', $lorry->id)->pluck('id');
@@ -1049,55 +1049,67 @@ class ReportController extends AppBaseController
                 continue;
             }
 
-            foreach ($period as $date) {
-                $day = $date->format('Y-m-d');
+            // Every sold line item for this lorry across the whole range, in one query
+            $lines = InvoiceDetail::join('invoices', 'invoices.id', '=', 'invoice_details.invoice_id')
+                ->whereIn('invoices.driver_id', $driverIds)
+                ->where('invoices.status', 1)
+                ->whereBetween(DB::raw('DATE(invoices.date)'), [$dateFrom, $dateTo])
+                ->select(
+                    'invoice_details.product_id',
+                    'invoice_details.totalprice',
+                    DB::raw('DATE(invoices.date) as sale_date')
+                )
+                ->get();
 
-                $invoiceIds = Invoice::whereIn('driver_id', $driverIds)
-                    ->where('status', 1)
-                    ->whereDate('date', $day)
-                    ->pluck('id');
-
-                $products = collect();
-                if ($invoiceIds->isNotEmpty()) {
-                    $productTotals = InvoiceDetail::whereIn('invoice_id', $invoiceIds)
-                        ->selectRaw('product_id, SUM(quantity) as qty, SUM(totalprice) as total')
-                        ->groupBy('product_id')
-                        ->with('product')
-                        ->get();
-
-                    $products = $productTotals->map(function ($pt) {
-                        $qty   = (float) $pt->qty;
-                        $total = round((float) $pt->total, 2);
-                        return [
-                            'code'       => $pt->product->code ?? '',
-                            'name'       => $pt->product->name ?? 'Unknown',
-                            'qty'        => $qty,
-                            'unit_price' => $qty > 0 ? round($total / $qty, 2) : 0,
-                            'total'      => $total,
-                        ];
-                    })->values();
-                }
-
-                $dayQty   = $products->sum('qty');
-                $dayTotal = round($products->sum('total'), 2);
-
-                $blocks->push([
-                    'lorry'    => $lorry->lorryno,
-                    'date'     => $day,
-                    'products' => $products,
-                    'qty'      => $dayQty,
-                    'total'    => $dayTotal,
-                ]);
-
-                $grandQty   += $dayQty;
-                $grandTotal += $dayTotal;
+            if ($lines->isEmpty()) {
+                continue;
             }
+
+            // Product columns: every product actually sold by this lorry in the range
+            $productIds = $lines->pluck('product_id')->unique()->filter()->values();
+            $products   = Product::whereIn('id', $productIds)->orderBy('name')->get(['id', 'name']);
+
+            // date => product_id => amount
+            $matrix = [];
+            foreach ($lines as $line) {
+                $matrix[$line->sale_date][$line->product_id] =
+                    ($matrix[$line->sale_date][$line->product_id] ?? 0) + $line->totalprice;
+            }
+
+            $columnTotals = array_fill_keys($products->pluck('id')->toArray(), 0);
+            $rows         = [];
+            $grandTotal   = 0;
+
+            foreach ($days as $day) {
+                $cells    = [];
+                $rowTotal = 0;
+                foreach ($products as $product) {
+                    $amount = round($matrix[$day][$product->id] ?? 0, 2);
+                    $cells[$product->id] = $amount;
+                    $rowTotal += $amount;
+                    $columnTotals[$product->id] += $amount;
+                }
+                $rows[] = [
+                    'date'  => $day,
+                    'cells' => $cells,
+                    'total' => round($rowTotal, 2),
+                ];
+                $grandTotal += $rowTotal;
+            }
+
+            $tables->push([
+                'lorry'         => $lorry->lorryno,
+                'products'      => $products,
+                'rows'          => $rows,
+                'column_totals' => $columnTotals,
+                'grand_total'   => round($grandTotal, 2),
+            ]);
         }
 
         $filename = 'lorry-monthly-sales-product-' . $dateFrom . '-to-' . $dateTo . '.xlsx';
 
         return Excel::download(new LorryMonthlySalesProductExport(
-            $blocks, $dateFrom, $dateTo, $grandQty, round($grandTotal, 2)
+            $tables, $dateFrom, $dateTo
         ), $filename);
     }
 

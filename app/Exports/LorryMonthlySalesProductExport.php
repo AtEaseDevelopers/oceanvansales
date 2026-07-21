@@ -8,23 +8,20 @@ use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use Carbon\Carbon;
 
 class LorryMonthlySalesProductExport implements FromArray, WithEvents
 {
-    protected $blocks;
+    protected $tables;
     protected $dateFrom;
     protected $dateTo;
-    protected $grandQty;
-    protected $grandTotal;
 
-    public function __construct($blocks, $dateFrom, $dateTo, $grandQty, $grandTotal)
+    public function __construct($tables, $dateFrom, $dateTo)
     {
-        $this->blocks     = $blocks;
-        $this->dateFrom   = $dateFrom;
-        $this->dateTo     = $dateTo;
-        $this->grandQty   = $grandQty;
-        $this->grandTotal = $grandTotal;
+        $this->tables   = $tables;
+        $this->dateFrom = $dateFrom;
+        $this->dateTo   = $dateTo;
     }
 
     /**
@@ -42,105 +39,103 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
 
-                $sheet->getColumnDimension('A')->setWidth(16);
-                $sheet->getColumnDimension('B')->setWidth(30);
-                $sheet->getColumnDimension('C')->setWidth(9);
-                $sheet->getColumnDimension('D')->setWidth(14);
-                $sheet->getColumnDimension('E')->setWidth(10);
-                $sheet->getColumnDimension('F')->setWidth(10);
+                $dateLabel = 'Date: ' . Carbon::parse($this->dateFrom)->format('d-m-Y')
+                    . ' - ' . Carbon::parse($this->dateTo)->format('d-m-Y');
 
                 $row = 1;
 
-                if (empty($this->blocks) || count($this->blocks) === 0) {
+                if (empty($this->tables) || count($this->tables) === 0) {
                     $sheet->setCellValue("A{$row}", 'No sales data found for this period.');
-                    $sheet->mergeCells("A{$row}:F{$row}");
+                    $sheet->mergeCells("A{$row}:B{$row}");
                     return;
                 }
 
-                foreach ($this->blocks as $block) {
+                foreach ($this->tables as $table) {
+                    $products    = $table['products'];
+                    $lastColIdx  = 2 + count($products); // A=Date, then one per product, then TOTAL RM
+                    $lastColLtr  = Coordinate::stringFromColumnIndex($lastColIdx);
+
                     $blockStart = $row;
 
                     // Lorry title
-                    $sheet->setCellValue("A{$row}", 'Lorry: ' . $block['lorry']);
-                    $sheet->mergeCells("A{$row}:F{$row}");
+                    $sheet->setCellValue("A{$row}", 'Lorry: ' . $table['lorry']);
+                    $sheet->mergeCells("A{$row}:{$lastColLtr}{$row}");
                     $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(13);
                     $row++;
 
-                    // Date (this block covers a single day)
-                    $sheet->setCellValue("A{$row}", 'Date: ' . Carbon::parse($block['date'])->format('d-m-Y'));
-                    $sheet->mergeCells("A{$row}:F{$row}");
+                    // Date range
+                    $sheet->setCellValue("A{$row}", $dateLabel);
+                    $sheet->mergeCells("A{$row}:{$lastColLtr}{$row}");
                     $row++;
 
+                    // Header row: Date | <product columns> | TOTAL RM
                     $headerRow = $row;
+                    $sheet->getColumnDimension('A')->setWidth(14);
+                    $sheet->setCellValue("A{$row}", 'Date');
 
-                    if (empty($block['products']) || count($block['products']) === 0) {
-                        $sheet->setCellValue("A{$row}", 'No sales recorded for this day.');
-                        $sheet->mergeCells("A{$row}:F{$row}");
-                        $row++;
-                    } else {
-                        // Column headers
-                        $sheet->setCellValue("A{$row}", 'Product Code');
-                        $sheet->setCellValue("B{$row}", 'Product Name');
-                        $sheet->setCellValue("C{$row}", 'Qty');
-                        $sheet->setCellValue("D{$row}", 'Unit Price (RM)');
-                        $sheet->mergeCells("E{$row}:F{$row}");
-                        $sheet->setCellValue("E{$row}", 'Total Sales (RM)');
-                        $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
-                        $sheet->getStyle("A{$row}:F{$row}")->getFill()
-                            ->setFillType(Fill::FILL_SOLID)
-                            ->getStartColor()->setRGB('E8E8E8');
-                        $row++;
+                    $colIdx = 2;
+                    foreach ($products as $product) {
+                        $colLtr = Coordinate::stringFromColumnIndex($colIdx);
+                        $sheet->getColumnDimension($colLtr)->setWidth(14);
+                        $sheet->setCellValue("{$colLtr}{$row}", $product->name);
+                        $colIdx++;
+                    }
 
-                        // Product rows
-                        foreach ($block['products'] as $p) {
-                            $sheet->setCellValue("A{$row}", $p['code']);
-                            $sheet->setCellValue("B{$row}", $p['name']);
-                            $sheet->setCellValue("C{$row}", $p['qty']);
-                            $sheet->setCellValue("D{$row}", $p['unit_price']);
-                            $sheet->mergeCells("E{$row}:F{$row}");
-                            $sheet->setCellValue("E{$row}", $p['total']);
-                            $row++;
+                    $sheet->getColumnDimension($lastColLtr)->setWidth(14);
+                    $sheet->setCellValue("{$lastColLtr}{$row}", 'TOTAL RM');
+
+                    $sheet->getStyle("A{$row}:{$lastColLtr}{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("A{$row}:{$lastColLtr}{$row}")->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()->setRGB('E8E8E8');
+                    $sheet->getStyle("A{$row}:{$lastColLtr}{$row}")
+                        ->getAlignment()->setWrapText(true)->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    $row++;
+
+                    // One row per day
+                    foreach ($table['rows'] as $dayRow) {
+                        $sheet->setCellValue("A{$row}", Carbon::parse($dayRow['date'])->format('d-m-Y'));
+
+                        $colIdx = 2;
+                        foreach ($products as $product) {
+                            $colLtr = Coordinate::stringFromColumnIndex($colIdx);
+                            $sheet->setCellValue("{$colLtr}{$row}", $dayRow['cells'][$product->id] ?? 0);
+                            $colIdx++;
                         }
 
-                        // Day total row
-                        $sheet->setCellValue("A{$row}", 'TOTAL');
-                        $sheet->mergeCells("A{$row}:B{$row}");
-                        $sheet->setCellValue("C{$row}", $block['qty']);
-                        $sheet->mergeCells("E{$row}:F{$row}");
-                        $sheet->setCellValue("E{$row}", $block['total']);
-                        $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
+                        $sheet->setCellValue("{$lastColLtr}{$row}", $dayRow['total']);
                         $row++;
                     }
 
+                    // Column totals row
+                    $sheet->setCellValue("A{$row}", 'TOTAL');
+                    $colIdx = 2;
+                    foreach ($products as $product) {
+                        $colLtr = Coordinate::stringFromColumnIndex($colIdx);
+                        $sheet->setCellValue("{$colLtr}{$row}", $table['column_totals'][$product->id] ?? 0);
+                        $colIdx++;
+                    }
+                    $sheet->setCellValue("{$lastColLtr}{$row}", $table['grand_total']);
+                    $sheet->getStyle("A{$row}:{$lastColLtr}{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("A{$row}:{$lastColLtr}{$row}")->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()->setRGB('E8E8E8');
+                    $row++;
+
                     $blockEnd = $row - 1;
 
-                    // Right-align numeric columns for this block
-                    $sheet->getStyle("C{$headerRow}:E{$blockEnd}")
+                    // Right-align numeric columns (everything except the Date column)
+                    $secondColLtr = Coordinate::stringFromColumnIndex(2);
+                    $sheet->getStyle("{$secondColLtr}{$headerRow}:{$lastColLtr}{$blockEnd}")
                         ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-                    // Border around this day's whole table
-                    $sheet->getStyle("A{$blockStart}:F{$blockEnd}")
+                    // Border around this lorry's whole table
+                    $sheet->getStyle("A{$blockStart}:{$lastColLtr}{$blockEnd}")
                         ->getBorders()->getAllBorders()
                         ->setBorderStyle(Border::BORDER_THIN);
 
-                    $row++; // blank spacer row between blocks
+                    $row++; // blank spacer row between lorries
                 }
-
-                // Grand total
-                $sheet->setCellValue("A{$row}", 'GRAND TOTAL');
-                $sheet->mergeCells("A{$row}:B{$row}");
-                $sheet->setCellValue("C{$row}", $this->grandQty);
-                $sheet->mergeCells("E{$row}:F{$row}");
-                $sheet->setCellValue("E{$row}", $this->grandTotal);
-                $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
-                $sheet->getStyle("A{$row}:F{$row}")->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setRGB('E8E8E8');
-                $sheet->getStyle("C{$row}:E{$row}")
-                    ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                $sheet->getStyle("A{$row}:F{$row}")
-                    ->getBorders()->getAllBorders()
-                    ->setBorderStyle(Border::BORDER_THIN);
             },
         ];
     }
