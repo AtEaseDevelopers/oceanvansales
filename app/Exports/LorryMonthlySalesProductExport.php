@@ -49,9 +49,6 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                 $sheet->getColumnDimension('E')->setWidth(10);
                 $sheet->getColumnDimension('F')->setWidth(10);
 
-                $dateLabel = 'Date: ' . Carbon::parse($this->dateFrom)->format('d-m-Y')
-                    . ' - ' . Carbon::parse($this->dateTo)->format('d-m-Y');
-
                 $row = 1;
 
                 if (empty($this->blocks) || count($this->blocks) === 0) {
@@ -69,44 +66,51 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                     $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(13);
                     $row++;
 
-                    // Date range
-                    $sheet->setCellValue("A{$row}", $dateLabel);
+                    // Date (this block covers a single day)
+                    $sheet->setCellValue("A{$row}", 'Date: ' . Carbon::parse($block['date'])->format('d-m-Y'));
                     $sheet->mergeCells("A{$row}:F{$row}");
                     $row++;
 
-                    // Column headers
                     $headerRow = $row;
-                    $sheet->setCellValue("A{$row}", 'Product Code');
-                    $sheet->setCellValue("B{$row}", 'Product Name');
-                    $sheet->setCellValue("C{$row}", 'Qty');
-                    $sheet->setCellValue("D{$row}", 'Unit Price (RM)');
-                    $sheet->mergeCells("E{$row}:F{$row}");
-                    $sheet->setCellValue("E{$row}", 'Total Sales (RM)');
-                    $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
-                    $sheet->getStyle("A{$row}:F{$row}")->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('E8E8E8');
-                    $row++;
 
-                    // Product rows
-                    foreach ($block['products'] as $p) {
-                        $sheet->setCellValue("A{$row}", $p['code']);
-                        $sheet->setCellValue("B{$row}", $p['name']);
-                        $sheet->setCellValue("C{$row}", $p['qty']);
-                        $sheet->setCellValue("D{$row}", $p['unit_price']);
+                    if (empty($block['products']) || count($block['products']) === 0) {
+                        $sheet->setCellValue("A{$row}", 'No sales recorded for this day.');
+                        $sheet->mergeCells("A{$row}:F{$row}");
+                        $row++;
+                    } else {
+                        // Column headers
+                        $sheet->setCellValue("A{$row}", 'Product Code');
+                        $sheet->setCellValue("B{$row}", 'Product Name');
+                        $sheet->setCellValue("C{$row}", 'Qty');
+                        $sheet->setCellValue("D{$row}", 'Unit Price (RM)');
                         $sheet->mergeCells("E{$row}:F{$row}");
-                        $sheet->setCellValue("E{$row}", $p['total']);
+                        $sheet->setCellValue("E{$row}", 'Total Sales (RM)');
+                        $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
+                        $sheet->getStyle("A{$row}:F{$row}")->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()->setRGB('E8E8E8');
+                        $row++;
+
+                        // Product rows
+                        foreach ($block['products'] as $p) {
+                            $sheet->setCellValue("A{$row}", $p['code']);
+                            $sheet->setCellValue("B{$row}", $p['name']);
+                            $sheet->setCellValue("C{$row}", $p['qty']);
+                            $sheet->setCellValue("D{$row}", $p['unit_price']);
+                            $sheet->mergeCells("E{$row}:F{$row}");
+                            $sheet->setCellValue("E{$row}", $p['total']);
+                            $row++;
+                        }
+
+                        // Day total row
+                        $sheet->setCellValue("A{$row}", 'TOTAL');
+                        $sheet->mergeCells("A{$row}:B{$row}");
+                        $sheet->setCellValue("C{$row}", $block['qty']);
+                        $sheet->mergeCells("E{$row}:F{$row}");
+                        $sheet->setCellValue("E{$row}", $block['total']);
+                        $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
                         $row++;
                     }
-
-                    // Lorry total row
-                    $sheet->setCellValue("A{$row}", $block['lorry'] . ' - TOTAL');
-                    $sheet->mergeCells("A{$row}:B{$row}");
-                    $sheet->setCellValue("C{$row}", $block['qty']);
-                    $sheet->mergeCells("E{$row}:F{$row}");
-                    $sheet->setCellValue("E{$row}", $block['total']);
-                    $sheet->getStyle("A{$row}:F{$row}")->getFont()->setBold(true);
-                    $row++;
 
                     $blockEnd = $row - 1;
 
@@ -114,12 +118,12 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                     $sheet->getStyle("C{$headerRow}:E{$blockEnd}")
                         ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-                    // Border around this lorry's whole table
+                    // Border around this day's whole table
                     $sheet->getStyle("A{$blockStart}:F{$blockEnd}")
                         ->getBorders()->getAllBorders()
                         ->setBorderStyle(Border::BORDER_THIN);
 
-                    $row++; // blank spacer row between lorries
+                    $row++; // blank spacer row between blocks
                 }
 
                 // Grand total

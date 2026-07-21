@@ -40,6 +40,7 @@ use App\Exports\DailySaleReportExport;
 use App\Exports\LorryMonthlySalesProductExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 
 class ReportController extends AppBaseController
 {
@@ -1040,55 +1041,57 @@ class ReportController extends AppBaseController
         $grandQty   = 0;
         $grandTotal = 0;
 
+        $period = CarbonPeriod::create($dateFrom, $dateTo);
+
         foreach ($lorries as $lorry) {
             $driverIds = Driver::where('lorry_id', $lorry->id)->pluck('id');
             if ($driverIds->isEmpty()) {
                 continue;
             }
 
-            $invoiceIds = Invoice::whereIn('driver_id', $driverIds)
-                ->where('status', 1)
-                ->whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
-                ->pluck('id');
+            foreach ($period as $date) {
+                $day = $date->format('Y-m-d');
 
-            if ($invoiceIds->isEmpty()) {
-                continue;
+                $invoiceIds = Invoice::whereIn('driver_id', $driverIds)
+                    ->where('status', 1)
+                    ->whereDate('date', $day)
+                    ->pluck('id');
+
+                $products = collect();
+                if ($invoiceIds->isNotEmpty()) {
+                    $productTotals = InvoiceDetail::whereIn('invoice_id', $invoiceIds)
+                        ->selectRaw('product_id, SUM(quantity) as qty, SUM(totalprice) as total')
+                        ->groupBy('product_id')
+                        ->with('product')
+                        ->get();
+
+                    $products = $productTotals->map(function ($pt) {
+                        $qty   = (float) $pt->qty;
+                        $total = round((float) $pt->total, 2);
+                        return [
+                            'code'       => $pt->product->code ?? '',
+                            'name'       => $pt->product->name ?? 'Unknown',
+                            'qty'        => $qty,
+                            'unit_price' => $qty > 0 ? round($total / $qty, 2) : 0,
+                            'total'      => $total,
+                        ];
+                    })->values();
+                }
+
+                $dayQty   = $products->sum('qty');
+                $dayTotal = round($products->sum('total'), 2);
+
+                $blocks->push([
+                    'lorry'    => $lorry->lorryno,
+                    'date'     => $day,
+                    'products' => $products,
+                    'qty'      => $dayQty,
+                    'total'    => $dayTotal,
+                ]);
+
+                $grandQty   += $dayQty;
+                $grandTotal += $dayTotal;
             }
-
-            $productTotals = InvoiceDetail::whereIn('invoice_id', $invoiceIds)
-                ->selectRaw('product_id, SUM(quantity) as qty, SUM(totalprice) as total')
-                ->groupBy('product_id')
-                ->with('product')
-                ->get();
-
-            if ($productTotals->isEmpty()) {
-                continue;
-            }
-
-            $products = $productTotals->map(function ($pt) {
-                $qty   = (float) $pt->qty;
-                $total = round((float) $pt->total, 2);
-                return [
-                    'code'       => $pt->product->code ?? '',
-                    'name'       => $pt->product->name ?? 'Unknown',
-                    'qty'        => $qty,
-                    'unit_price' => $qty > 0 ? round($total / $qty, 2) : 0,
-                    'total'      => $total,
-                ];
-            })->values();
-
-            $lorryQty   = $products->sum('qty');
-            $lorryTotal = round($products->sum('total'), 2);
-
-            $blocks->push([
-                'lorry'    => $lorry->lorryno,
-                'products' => $products,
-                'qty'      => $lorryQty,
-                'total'    => $lorryTotal,
-            ]);
-
-            $grandQty   += $lorryQty;
-            $grandTotal += $lorryTotal;
         }
 
         $filename = 'lorry-monthly-sales-product-' . $dateFrom . '-to-' . $dateTo . '.xlsx';
