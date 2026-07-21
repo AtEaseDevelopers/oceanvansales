@@ -39,20 +39,21 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
 
-                $dateLabel = 'Date: ' . Carbon::parse($this->dateFrom)->format('d-m-Y')
-                    . ' - ' . Carbon::parse($this->dateTo)->format('d-m-Y');
+                $monthLabel = Carbon::parse($this->dateFrom)->format('F Y');
 
                 $row = 1;
 
                 if (empty($this->tables) || count($this->tables) === 0) {
-                    $sheet->setCellValue("A{$row}", 'No sales data found for this period.');
+                    $sheet->setCellValue("A{$row}", 'No lorries found.');
                     $sheet->mergeCells("A{$row}:B{$row}");
                     return;
                 }
 
                 foreach ($this->tables as $table) {
                     $products    = $table['products'];
-                    $lastColIdx  = 2 + count($products); // A=Date, then one per product, then TOTAL RM
+                    $hasData     = count($products) > 0;
+                    // A=Date, one column per product, then TOTAL RM (minimum 2 columns when there's no data)
+                    $lastColIdx  = $hasData ? (2 + count($products)) : 2;
                     $lastColLtr  = Coordinate::stringFromColumnIndex($lastColIdx);
 
                     $blockStart = $row;
@@ -63,14 +64,27 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                     $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(13);
                     $row++;
 
-                    // Date range
-                    $sheet->setCellValue("A{$row}", $dateLabel);
+                    // Month
+                    $sheet->setCellValue("A{$row}", $monthLabel);
                     $sheet->mergeCells("A{$row}:{$lastColLtr}{$row}");
                     $row++;
 
+                    if (!$hasData) {
+                        $sheet->setCellValue("A{$row}", 'No sales recorded for this lorry in this period.');
+                        $sheet->mergeCells("A{$row}:{$lastColLtr}{$row}");
+                        $row++;
+
+                        $blockEnd = $row - 1;
+                        $sheet->getStyle("A{$blockStart}:{$lastColLtr}{$blockEnd}")
+                            ->getBorders()->getAllBorders()
+                            ->setBorderStyle(Border::BORDER_THIN);
+                        $row++; // blank spacer row between lorries
+                        continue;
+                    }
+
                     // Header row: Date | <product columns> | TOTAL RM
                     $headerRow = $row;
-                    $sheet->getColumnDimension('A')->setWidth(14);
+                    $sheet->getColumnDimension('A')->setWidth(10);
                     $sheet->setCellValue("A{$row}", 'Date');
 
                     $colIdx = 2;
@@ -92,9 +106,9 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                         ->getAlignment()->setWrapText(true)->setHorizontal(Alignment::HORIZONTAL_CENTER);
                     $row++;
 
-                    // One row per day
+                    // One row per day — Date column shows the day-of-month only
                     foreach ($table['rows'] as $dayRow) {
-                        $sheet->setCellValue("A{$row}", Carbon::parse($dayRow['date'])->format('d-m-Y'));
+                        $sheet->setCellValue("A{$row}", (int) Carbon::parse($dayRow['date'])->format('j'));
 
                         $colIdx = 2;
                         foreach ($products as $product) {
@@ -107,7 +121,7 @@ class LorryMonthlySalesProductExport implements FromArray, WithEvents
                         $row++;
                     }
 
-                    // Column totals row
+                    // Column totals row: qty totals per product, RM grand total in the last column
                     $sheet->setCellValue("A{$row}", 'TOTAL');
                     $colIdx = 2;
                     foreach ($products as $product) {

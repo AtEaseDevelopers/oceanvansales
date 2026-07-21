@@ -1045,23 +1045,30 @@ class ReportController extends AppBaseController
 
         foreach ($lorries as $lorry) {
             $driverIds = Driver::where('lorry_id', $lorry->id)->pluck('id');
-            if ($driverIds->isEmpty()) {
-                continue;
-            }
 
-            // Every sold line item for this lorry across the whole range, in one query
-            $lines = InvoiceDetail::join('invoices', 'invoices.id', '=', 'invoice_details.invoice_id')
-                ->whereIn('invoices.driver_id', $driverIds)
-                ->where('invoices.status', 1)
-                ->whereBetween(DB::raw('DATE(invoices.date)'), [$dateFrom, $dateTo])
-                ->select(
-                    'invoice_details.product_id',
-                    'invoice_details.totalprice',
-                    DB::raw('DATE(invoices.date) as sale_date')
-                )
-                ->get();
+            $lines = $driverIds->isEmpty()
+                ? collect()
+                : InvoiceDetail::join('invoices', 'invoices.id', '=', 'invoice_details.invoice_id')
+                    ->whereIn('invoices.driver_id', $driverIds)
+                    ->where('invoices.status', 1)
+                    ->whereBetween(DB::raw('DATE(invoices.date)'), [$dateFrom, $dateTo])
+                    ->select(
+                        'invoice_details.product_id',
+                        'invoice_details.quantity',
+                        'invoice_details.totalprice',
+                        DB::raw('DATE(invoices.date) as sale_date')
+                    )
+                    ->get();
 
+            // Every lorry gets an entry, even with no sales in the range
             if ($lines->isEmpty()) {
+                $tables->push([
+                    'lorry'         => $lorry->lorryno,
+                    'products'      => collect(),
+                    'rows'          => [],
+                    'column_totals' => [],
+                    'grand_total'   => 0,
+                ]);
                 continue;
             }
 
@@ -1069,11 +1076,14 @@ class ReportController extends AppBaseController
             $productIds = $lines->pluck('product_id')->unique()->filter()->values();
             $products   = Product::whereIn('id', $productIds)->orderBy('name')->get(['id', 'name']);
 
-            // date => product_id => amount
-            $matrix = [];
+            // date => product_id => qty, and date => total RM (independent of product breakdown)
+            $matrix          = [];
+            $dayAmountTotals = [];
             foreach ($lines as $line) {
                 $matrix[$line->sale_date][$line->product_id] =
-                    ($matrix[$line->sale_date][$line->product_id] ?? 0) + $line->totalprice;
+                    ($matrix[$line->sale_date][$line->product_id] ?? 0) + $line->quantity;
+                $dayAmountTotals[$line->sale_date] =
+                    ($dayAmountTotals[$line->sale_date] ?? 0) + $line->totalprice;
             }
 
             $columnTotals = array_fill_keys($products->pluck('id')->toArray(), 0);
@@ -1081,20 +1091,19 @@ class ReportController extends AppBaseController
             $grandTotal   = 0;
 
             foreach ($days as $day) {
-                $cells    = [];
-                $rowTotal = 0;
+                $cells = [];
                 foreach ($products as $product) {
-                    $amount = round($matrix[$day][$product->id] ?? 0, 2);
-                    $cells[$product->id] = $amount;
-                    $rowTotal += $amount;
-                    $columnTotals[$product->id] += $amount;
+                    $qty = (float) ($matrix[$day][$product->id] ?? 0);
+                    $cells[$product->id] = $qty;
+                    $columnTotals[$product->id] += $qty;
                 }
+                $dayTotal = round($dayAmountTotals[$day] ?? 0, 2);
                 $rows[] = [
                     'date'  => $day,
                     'cells' => $cells,
-                    'total' => round($rowTotal, 2),
+                    'total' => $dayTotal,
                 ];
-                $grandTotal += $rowTotal;
+                $grandTotal += $dayTotal;
             }
 
             $tables->push([
