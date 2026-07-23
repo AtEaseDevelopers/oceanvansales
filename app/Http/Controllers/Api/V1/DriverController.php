@@ -4102,6 +4102,7 @@ class DriverController extends Controller
             <br>
             <br>
             <br>
+            <hr style="border: none; border-top: 1px solid black;">
         </body>
 
         </html>
