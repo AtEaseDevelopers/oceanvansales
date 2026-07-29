@@ -34,9 +34,9 @@ class TripDataTable extends DataTable
             }
 
             return '<div class="btn-group">
-                        <a href="' . route('trips.report', Crypt::encrypt($row->id)) . '" target="_blank" class="btn btn-sm btn-primary">
+                        <button type="button" class="btn btn-sm btn-primary btn-trip-report" data-trip-id="' . Crypt::encrypt($row->id) . '">
                             <i class="fa fa-file-pdf-o"></i> Report
-                        </a>
+                        </button>
                         ' . $imageBtn . '
                     </div>';
         } else {
