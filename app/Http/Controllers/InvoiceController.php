@@ -591,30 +591,35 @@ class InvoiceController extends AppBaseController
 
         if($invoice->paymentterm == 1)
         {
-            // Check invoice payment if cash 
+            // Check invoice payment if cash
             $id = $input['invoice_id'];
             $invoicePayment = InvoicePayment::where('invoice_id', $id)->first();
-            
+
             $totalAmount = InvoiceDetail::where('invoice_id', $id)->sum('totalprice');
 
-            if(!$invoicePayment)
+            // A zero-amount invoice (e.g. all lines are FOC or a customer with a
+            // 0 special price) has nothing to pay — don't create/activate a payment for it.
+            if($totalAmount > 0)
             {
-                $invoicepayment_new = New InvoicePayment();
-                $invoicepayment_new->invoice_id = $id;
-                $invoicepayment_new->type = 1;
-                $invoicepayment_new->customer_id = $invoice->customer_id;
-                $invoicepayment_new->amount = $totalAmount;
-                $invoicepayment_new->status = $invoice->status;
-                $invoicepayment_new->driver_id = $invoice->driver_id;
-                $invoicepayment_new->approve_by = Auth::user()->email;
-                $invoicepayment_new->approve_at = date('Y-m-d H:i:s');
-                $invoicepayment_new->save();
-            }
-            else
-            {
-                $invoicePayment->status = 1;
-                $invoicePayment->amount = $totalAmount;
-                $invoicePayment->save();
+                if(!$invoicePayment)
+                {
+                    $invoicepayment_new = New InvoicePayment();
+                    $invoicepayment_new->invoice_id = $id;
+                    $invoicepayment_new->type = 1;
+                    $invoicepayment_new->customer_id = $invoice->customer_id;
+                    $invoicepayment_new->amount = $totalAmount;
+                    $invoicepayment_new->status = $invoice->status;
+                    $invoicepayment_new->driver_id = $invoice->driver_id;
+                    $invoicepayment_new->approve_by = Auth::user()->email;
+                    $invoicepayment_new->approve_at = date('Y-m-d H:i:s');
+                    $invoicepayment_new->save();
+                }
+                else
+                {
+                    $invoicePayment->status = 1;
+                    $invoicePayment->amount = $totalAmount;
+                    $invoicePayment->save();
+                }
             }
         }
 

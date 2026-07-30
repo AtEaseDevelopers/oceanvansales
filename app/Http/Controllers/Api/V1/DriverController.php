@@ -1788,7 +1788,7 @@ class DriverController extends Controller
                 $inventorytransaction->date = date('Y-m-d H:i:s');
                 $inventorytransaction->save();
             }
-            if($data['type'] == 1){
+            if($data['type'] == 1 && $totalprice > 0){
                 $invoicepayment = New InvoicePayment();
                 $invoicepayment->invoice_id = $invoice->id;
                 $invoicepayment->type = $data['type'];
@@ -1980,7 +1980,8 @@ class DriverController extends Controller
                     $inventorytransaction->save();
                 }
 
-                if ($invoiceInput['type'] == 1) {
+                $paymentCreated = false;
+                if ($invoiceInput['type'] == 1 && $totalprice > 0) {
                     $invoicepayment             = new InvoicePayment();
                     $invoicepayment->invoice_id = $invoice->id;
                     $invoicepayment->type       = $invoiceInput['type'];
@@ -1991,6 +1992,7 @@ class DriverController extends Controller
                     $invoicepayment->approve_by = $driver->name;
                     $invoicepayment->approve_at = date('Y-m-d H:i:s');
                     $invoicepayment->save();
+                    $paymentCreated = true;
                 }
 
                 Task::where('customer_id', $customer->id)
@@ -2013,7 +2015,7 @@ class DriverController extends Controller
                     'total'           => $totalprice,
                     'paymentterm'     => $invoice->paymentterm,
                     'status'          => $invoice->status,
-                    'payment_created' => $invoiceInput['type'] == 1,
+                    'payment_created' => $paymentCreated,
                     'items_count'     => count($invoiceInput['invoicedetail']),
                     'data'            => $iv,
                 ];
