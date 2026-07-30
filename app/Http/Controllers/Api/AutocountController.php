@@ -73,9 +73,12 @@ class AutocountController extends Controller
         }
 
         // Ignore the ambient company scope: filter strictly by the resolved branch.
+        // Cancelled invoices are excluded even if they were queued before being
+        // cancelled — the plugin should never create an AutoCount document for one.
         $invoices = Invoice::withoutGlobalScope('company')
             ->where('autocount_status', Invoice::AUTOCOUNT_QUEUED)
             ->where('company_id', $company->id)
+            ->where('status', '!=', 2)
             ->orderBy('id')
             ->get();
 

@@ -505,7 +505,9 @@ class InvoiceController extends AppBaseController
             return response()->json(['message' => 'Please select at least one invoice.'], 422);
         }
 
+        // Cancelled invoices are never synced to AutoCount, even if selected.
         $count = Invoice::whereIn('id', $ids)
+            ->where('status', '!=', 2)
             ->update([
                 'autocount_status'    => Invoice::AUTOCOUNT_QUEUED,
                 'autocount_docno'     => null,
