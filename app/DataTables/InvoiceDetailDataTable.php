@@ -112,6 +112,12 @@ class InvoiceDetailDataTable extends DataTable
                         'targets' => 0,
                         'visible' => true,
                         'render' => 'function(data, type){return "<input type=\'checkbox\' class=\'checkboxselect\' checkboxid=\'"+data+"\'/>";}'
+                    ],
+                    [
+                        'targets' => [4, 5],
+                        'render' => 'function(data, type){
+                                return type === "display" ? parseFloat(data || 0).toFixed(2) : data;
+                            }'
                     ]
                 ],
                 'initComplete' => 'function(){
@@ -171,10 +177,6 @@ class InvoiceDetailDataTable extends DataTable
             'totalprice'=> new \Yajra\DataTables\Html\Column(['title' => trans('invoice_details.total_price'),
             'data' => 'totalprice',
             'name' => 'totalprice']),
-
-            'remark'=> new \Yajra\DataTables\Html\Column(['title' => trans('invoice_details.remark'),
-            'data' => 'totalprice',
-            'name' => 'remark']),
 
         ];
     }
