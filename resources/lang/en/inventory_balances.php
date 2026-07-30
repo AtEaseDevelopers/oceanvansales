@@ -7,6 +7,7 @@ return [
     'lorry' => 'Lorry',
     'product' => 'Product',
     'quantity' => 'Quantity',
+    'remark' => 'Remark',
     'select_lorry' => 'Select lorry',
     'stock_in' => 'Stock in',
     'stock_out' => 'Stock out',

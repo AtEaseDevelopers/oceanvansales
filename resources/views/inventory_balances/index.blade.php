@@ -91,6 +91,12 @@
                             <input type="number" min="0" class="form-control" placeholder="Transfer Quantity" name="quantity">
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label for="remark" class="col-form-label">{{ __('inventory_balances.remark') }}:</label>
+                        <textarea class="form-control" name="remark" rows="2" placeholder="Remark (optional)"></textarea>
+                    </div>
+
                     <button type="button" class="btn btn-secondary rounded-0 mt-2" data-dismiss="modal">{{ __('inventory_balances.cancel') }}</button>
                     <button type="submit" name="button" class="btn btn-primary rounded-0 mt-2">{{ __('inventory_balances.update') }}</button>
                     {!! Form::close() !!}
@@ -164,6 +170,12 @@
                             <input type="number" min="0" class="form-control" placeholder="Transfer Quantity" name="quantity" id="quantity">
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label for="remark" class="col-form-label">{{ __('inventory_balances.remark') }}:</label>
+                        <textarea class="form-control" name="remark" rows="2" placeholder="Remark (optional)"></textarea>
+                    </div>
+
                     <button type="button" class="btn btn-secondary rounded-0 mt-2" data-dismiss="modal">{{ __('inventory_balances.cancel') }}</button>
                     <button type="submit" name="button" class="btn btn-primary rounded-0 mt-2">{{ __('inventory_balances.update') }}</button>
                     {!! Form::close() !!}

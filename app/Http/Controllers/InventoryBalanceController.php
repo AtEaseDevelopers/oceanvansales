@@ -58,6 +58,7 @@ class InventoryBalanceController extends AppBaseController
 				$inventoryTransaction->product_id = $inventoryBalance->product_id;
 				$inventoryTransaction->quantity = $data['quantity'];
 				$inventoryTransaction->date = date("Y-m-d H:i:s");
+				$inventoryTransaction->remark = $data['remark'] ?? null;
 				$inventoryTransaction->user = Auth::user()->email . ' (' . Auth::user()->name . ')';
 				$inventoryTransaction->save();
 
@@ -77,6 +78,7 @@ class InventoryBalanceController extends AppBaseController
 				$inventoryTransaction->product_id = $data['product_id'];
 				$inventoryTransaction->quantity = $data['quantity'];
 				$inventoryTransaction->date = date("Y-m-d H:i:s");
+				$inventoryTransaction->remark = $data['remark'] ?? null;
 				$inventoryTransaction->user = Auth::user()->email . ' (' . Auth::user()->name . ')';
 				$inventoryTransaction->save();
 
@@ -140,6 +142,7 @@ class InventoryBalanceController extends AppBaseController
             $inventorytransaction->product_id = $data['product_id'];
             $inventorytransaction->quantity = $data['quantity'] * -1;
             $inventorytransaction->date = date("Y-m-d H:i:s");
+            $inventorytransaction->remark = $data['remark'] ?? null;
             $inventorytransaction->user = Auth::user()->email . ' (' . Auth::user()->name . ')';
             $inventorytransaction->save();
 

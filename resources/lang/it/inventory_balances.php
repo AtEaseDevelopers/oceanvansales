@@ -7,6 +7,7 @@ return [
     'lorry' => '货车',
     'product' => '产品',
     'quantity' => '数量',
+    'remark' => '备注',
     'select_lorry' => '选择货车',
     'stock_in' => '入库',
     'stock_out' => '出库',
