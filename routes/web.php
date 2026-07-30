@@ -468,8 +468,6 @@ Route::group(['middleware' => ['auth']], function() {
     });
     Route::group(['middleware' => ['permission:trip']], function() {
         Route::get('trips/{id}/report', [App\Http\Controllers\TripController::class, 'report'])->name('trips.report');
-        Route::get('trips/{id}/aneka', [App\Http\Controllers\TripController::class, 'anekaForm'])->name('trips.aneka.form');
-        Route::post('trips/{id}/aneka', [App\Http\Controllers\TripController::class, 'saveAneka'])->name('trips.aneka.save');
         Route::resource('trips', App\Http\Controllers\TripController::class);
     });
     Route::group(['middleware' => ['permission:inventorybalance']], function() {

@@ -145,21 +145,20 @@
 <table class="stock-table">
     <thead>
         <tr>
-            <th class="col-product" style="width:24%">Product</th>
-            <th style="width:10%">Opening Stock</th>
-            <th style="width:9%">Admin In<br><span style="font-weight:normal;font-size:9px;">(Assigned)</span></th>
-            <th style="width:9%">Admin Out<br><span style="font-weight:normal;font-size:9px;">(Removed)</span></th>
-            <th style="width:10%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(Invoiced)</span></th>
-            <th style="width:9%">Wastage<br><span style="font-weight:normal;font-size:9px;">(Written Off)</span></th>
-            <th style="width:9%">ANEKA</th>
+            <th class="col-product" style="width:28%">Product</th>
+            <th style="width:12%">Opening Stock</th>
+            <th style="width:10%">Admin In<br><span style="font-weight:normal;font-size:9px;">(Assigned)</span></th>
+            <th style="width:10%">Admin Out<br><span style="font-weight:normal;font-size:9px;">(Removed)</span></th>
+            <th style="width:12%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(Invoiced)</span></th>
+            <th style="width:10%">Wastage<br><span style="font-weight:normal;font-size:9px;">(Written Off)</span></th>
             <th style="width:12%">Closing Stock</th>
-            <th style="width:8%">Variance</th>
+            <th style="width:6%">Variance</th>
         </tr>
     </thead>
     <tbody>
         @forelse($stockMovements as $row)
         @php
-            $variance = $row['closing_stock'] - ($row['opening_stock'] + $row['admin_in'] - $row['admin_out'] - $row['sales_used'] - $row['wastage'] - $row['aneka']);
+            $variance = $row['closing_stock'] - ($row['opening_stock'] + $row['admin_in'] - $row['admin_out'] - $row['sales_used'] - $row['wastage']);
         @endphp
         <tr>
             <td class="col-product">{{ $row['product_name'] }}</td>
@@ -168,12 +167,11 @@
             <td class="{{ $row['admin_out'] > 0 ? 'neg' : '' }}">{{ $row['admin_out'] > 0 ? '-' : '' }}{{ $row['admin_out'] }}</td>
             <td class="{{ $row['sales_used'] > 0 ? 'neg' : '' }}">{{ $row['sales_used'] > 0 ? '-' : '' }}{{ $row['sales_used'] }}</td>
             <td class="{{ $row['wastage'] > 0 ? 'neg' : '' }}">{{ $row['wastage'] > 0 ? '-' : '' }}{{ $row['wastage'] }}</td>
-            <td class="{{ $row['aneka'] > 0 ? 'neg' : '' }}">{{ $row['aneka'] > 0 ? '-' : '' }}{{ $row['aneka'] }}</td>
             <td style="font-weight:bold;">{{ $row['closing_stock'] }}</td>
             <td class="{{ $variance != 0 ? 'neg' : '' }}">{{ $variance != 0 ? ($variance > 0 ? '+' : '') . $variance : '—' }}</td>
         </tr>
         @empty
-        <tr><td colspan="9" style="text-align:center;padding:10px;color:#999;">No stock snapshot available for this trip.</td></tr>
+        <tr><td colspan="8" style="text-align:center;padding:10px;color:#999;">No stock snapshot available for this trip.</td></tr>
         @endforelse
     </tbody>
 </table>
