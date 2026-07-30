@@ -5,7 +5,6 @@ namespace App\DataTables;
 use App\Models\InvoicePayment;
 use Yajra\DataTables\Services\DataTable;
 use Yajra\DataTables\EloquentDataTable;
-use App\Models\Code;
 use App\Models\Customer;
 
 class InvoicePaymentDataTable extends DataTable
@@ -140,6 +139,12 @@ class InvoicePaymentDataTable extends DataTable
                             }'
                     ],
                     [
+                        'targets' => 6,
+                        'render' => 'function(data, type){
+                                return type === "display" ? parseFloat(data || 0).toFixed(2) : data;
+                            }'
+                    ],
+                    [
                         'targets' => 8,
                         'render' => 'function(data, type){ if(data != null){return "<a target=\'_blank\' href=\''.config('app.url').'/"+data+"\'>view</a>";}else{return "";}}'
                     ],
@@ -177,8 +182,6 @@ class InvoicePaymentDataTable extends DataTable
                                 var input = \'<input type="text" id="\'+index+\'Date" onclick="searchDateColumn(this);" placeholder="Search ">\';
                             }else if(columns[index].title == \'Date\'){
                                 var input = \'<input type="text" id="\'+index+\'Date" onclick="searchDateColumn(this);" placeholder="Search ">\';
-                            }else if(columns[index].title == \'Group\'){
-                                var input = \'<select id="group" class="border-0" style="width: 100%;"><option value=""></option></select>\';
                             }else{
                                 var input = \'<input type="text" placeholder="Search ">\';
                             }
@@ -187,14 +190,6 @@ class InvoicePaymentDataTable extends DataTable
                                 ShowLoad();
                             })
                         }
-                    });
-                    var groupItems = '.json_encode(Code::where('code','customer_group')->pluck('description','value')->toArray()).';
-                    var x = document.getElementById("group");
-                    $.each(groupItems, function( index, value ) {
-                        var option = document.createElement("option");
-                        option.text = value;
-                        option.value = index;
-                        x.add(option);
                     });
                 }'
             ]);
@@ -231,8 +226,8 @@ class InvoicePaymentDataTable extends DataTable
             'name' => 'payment_no']),
             
             'invoice_id'=> new \Yajra\DataTables\Html\Column(['title' => trans('invoice_payments.invoice_no'),
-            'data' => 'invoice_id',
-            'name' => 'invoice.invoice_no']),
+            'data' => 'invoice.invoiceno',
+            'name' => 'invoice.invoiceno']),
 
             'amount'=> new \Yajra\DataTables\Html\Column(['title' => trans('invoice_payments.amount'),
             'data' => 'amount',
@@ -259,11 +254,6 @@ class InvoicePaymentDataTable extends DataTable
             // 'name' => 'xero_status']),
 
             // 'remark',
-
-            'group'=> new \Yajra\DataTables\Html\Column(['title' => trans('invoice_payments.group'),
-            'data' => 'customer.GroupDescription',
-            'name' => 'customer.group',
-            'orderable' => false]),
         ];
     }
 

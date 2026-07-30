@@ -49,7 +49,6 @@ class InvoiceDataTable extends DataTable
         ->with('customer')
         ->with('driver:id,name')
         ->with('kelindan:id,name')
-        ->with('agent:id,name')
         ->with('supervisor:id,name')
         ->with('invoicedetail')
         ->select('invoices.*');
@@ -134,23 +133,23 @@ class InvoiceDataTable extends DataTable
                         'render' => 'function(data, type){return "<input type=\'checkbox\' class=\'checkboxselect\' checkboxid=\'"+data+"\'/>";}'
                     ],
                     [
-                        'targets' => 7,
+                        'targets' => 6,
                         'visible' => true,
                         'render' => 'function(data, type){var totalprice = 0; $.each(data,function(index,value){ totalprice=totalprice+parseFloat(value.totalprice) }); return totalprice.toFixed(2);}'
                     ],
                     [
-                    'targets' => 8,
+                    'targets' => 7,
                     'render' => 'function(data, type, row){
                             var map = {1:"Cash",2:"Credit",3:"Online BankIn",4:"E-wallet",5:"Cheque"};
                             return map[data] || data || "";
                         }'
                     ],
                     [
-                    'targets' => 9,
+                    'targets' => 8,
                     'render' => 'function(data, type){var map = {1:"Completed",2:"Cancelled"}; return map[data] || "New";}'
                     ],
                     [
-                    'targets' => 10,
+                    'targets' => 9,
                     'orderable' => false,
                     'render' => 'function(data, type, row){
                             var labels = {0:"Not Synced",1:"Queued",2:"Synced",3:"Failed"};
@@ -236,13 +235,6 @@ class InvoiceDataTable extends DataTable
                 'title' => trans('invoices.kelindan'),
                 'data' => 'kelindan.name',
                 'name' => 'kelindan.name'
-            ]),
-
-            'agent_id' => new \Yajra\DataTables\Html\Column([
-                'title' => trans('invoices.agent'),
-                'data' => 'agent.name',
-                'name' => 'agent.name',
-                'visible' => false
             ]),
 
             // 'supervisor_id' => new \Yajra\DataTables\Html\Column([

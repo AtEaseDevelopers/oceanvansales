@@ -216,6 +216,11 @@ class InvoiceController extends AppBaseController
             ]);
         }
 
+        // Skip payment-term reconciliation entirely when the invoice is being cancelled —
+        // the cascade above already cancelled the payment, and this block (designed to
+        // keep a Cash payment in sync with the invoice) would otherwise re-approve it.
+        if($input['status'] != 2)
+        {
          if($old_payment != $input['paymentterm'])
         {
             $invoicePayment = InvoicePayment::where('invoice_id', $id)->first();
@@ -285,6 +290,7 @@ class InvoiceController extends AppBaseController
                     $invoicePayment->save();
                 }
             }
+        }
         }
 
 
