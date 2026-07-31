@@ -140,22 +140,20 @@ class Invoice extends Model
      * Sequence is per-company per-month, auto-expands beyond 5 digits if needed.
      *
      * When $isAneka is true, a "DO" prefix is added in front of the whole number
-     * (e.g. DOOC2607/00247). ANEKA and non-ANEKA invoices still share one continuous
-     * sequence counter per company/month, so the lookup below matches both the plain
-     * and DO-prefixed forms to find the true last sequence used.
+     * (e.g. DOOC2607/00001). DO-prefixed (ANEKA) invoices run their own independent
+     * sequence counter, separate from regular invoices — the lookup pattern includes
+     * the DO prefix so it only matches prior invoices of the same kind.
      */
     public static function generateInvoiceNo(bool $isAneka = false): string
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
+        $invoicePrefix = $isAneka ? 'DO' . $prefix : $prefix;
         $yy = date('y');
         $mm = date('m');
-        $basePattern = $prefix . $yy . $mm . '/%';
+        $pattern = $invoicePrefix . $yy . $mm . '/%';
 
-        $lastInvoice = static::where(function ($query) use ($basePattern) {
-                $query->where('invoiceno', 'LIKE', $basePattern)
-                    ->orWhere('invoiceno', 'LIKE', 'DO' . $basePattern);
-            })
+        $lastInvoice = static::where('invoiceno', 'LIKE', $pattern)
             ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/', invoiceno) + 1) AS UNSIGNED) DESC")
             ->first();
 
@@ -166,9 +164,7 @@ class Invoice extends Model
         $nextSeq = $lastSeq + 1;
         $digits = max(5, strlen((string) $nextSeq));
 
-        $invoiceNo = $prefix . $yy . $mm . '/' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
-
-        return $isAneka ? 'DO' . $invoiceNo : $invoiceNo;
+        return $invoicePrefix . $yy . $mm . '/' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
     }
 
     public function getDateAttribute($value)
