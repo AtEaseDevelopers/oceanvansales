@@ -1695,7 +1695,7 @@ class DriverController extends Controller
                 if($data['invoiceno'] != null){
                     $invoiceno = $data['invoiceno'];
                 }else{
-                    $invoiceno = Invoice::generateInvoiceNo();
+                    $invoiceno = Invoice::generateInvoiceNo($customer->isAneka());
                 }
             }
             // Reject duplicate invoiceno within same company (BelongsToCompany scope applies automatically)
@@ -1892,10 +1892,10 @@ class DriverController extends Controller
 
                 DB::beginTransaction();
 
-                $invoiceno = !empty($invoiceInput['invoiceno']) ? $invoiceInput['invoiceno'] : Invoice::generateInvoiceNo();
+                $invoiceno = !empty($invoiceInput['invoiceno']) ? $invoiceInput['invoiceno'] : Invoice::generateInvoiceNo($customer->isAneka());
 
                 if (Invoice::where('invoiceno', $invoiceno)->exists()) {
-                    $invoiceno = Invoice::generateInvoiceNo();
+                    $invoiceno = Invoice::generateInvoiceNo($customer->isAneka());
                 }
 
                 $invoice               = new Invoice();

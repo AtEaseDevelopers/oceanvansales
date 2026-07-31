@@ -33,6 +33,15 @@ class Customer extends Model
         'GroupDescription',
     ];
 
+    /**
+     * ANEKA-branded customer (e.g. "(BABY AIS) ANEKA ..." / "(AIS HANCUR) ANEKA ...").
+     * Invoices created for these customers get a "DO" prefix on their invoice number.
+     */
+    public function isAneka(): bool
+    {
+        return stripos($this->company, 'ANEKA') !== false;
+    }
+
     public $fillable = [
         'code',
         'company',

@@ -78,7 +78,8 @@ class InvoiceController extends AppBaseController
         $input['date'] = date_create($input['date']);
         $input['status'] = 1;
         if($input['invoiceno'] == null){
-            $input['invoiceno'] = Invoice::generateInvoiceNo();
+            $customer = Customer::find($input['customer_id']);
+            $input['invoiceno'] = Invoice::generateInvoiceNo($customer && $customer->isAneka());
         }
 
         if ($request->hasFile('attachment')) {
@@ -194,7 +195,8 @@ class InvoiceController extends AppBaseController
 
         $input['date'] = date_create($input['date']);
         if($input['invoiceno'] == null){
-            $input['invoiceno'] = Invoice::generateInvoiceNo();
+            $customer = Customer::find($input['customer_id']);
+            $input['invoiceno'] = Invoice::generateInvoiceNo($customer && $customer->isAneka());
         }
 
         if ($request->hasFile('attachment')) {
