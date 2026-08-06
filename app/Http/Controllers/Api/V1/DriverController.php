@@ -4441,7 +4441,7 @@ class DriverController extends Controller
         return \Blade::render($html, ['company' => $company]);
     }
 
-    public function DOHtml(Request $request){
+    public function DoHtml(Request $request){
         try{
             $data = $request->all();
 
