@@ -25,6 +25,20 @@
             {{-- {!! Form::select('group[]', $groups, explode(",", $customer->group ?? ""), ['class' => 'selectpicker form-control', 'placeholder' => 'Select Group']) !!} --}}
         </div>
 
+        <!-- Customer Code Field -->
+        <div class="form-group">
+            {!! Form::label('customer_code', 'Customer Code:') !!}
+            {!! Form::text('customer_code', null, ['class' => 'form-control', 'maxlength' => 255, 'placeholder' => 'Used as "Product - Code" on converted Delivery Order invoices']) !!}
+        </div>
+
+        <!-- Is DO Field -->
+        <div class="form-group form-check">
+            {!! Form::hidden('is_do', 0) !!}
+            {!! Form::checkbox('is_do', 1, null, ['class' => 'form-check-input', 'id' => 'is_do']) !!}
+            {!! Form::label('is_do', 'Is DO', ['class' => 'form-check-label']) !!}
+            <small class="d-block text-muted">When checked, invoices created for this customer from the driver app are created as Delivery Orders instead.</small>
+        </div>
+
         <!-- Agent Id Field -->
         <div class="form-group">
             {!! Form::label('agent_id', __('customers.agent')) !!}:
@@ -190,6 +204,25 @@
                 });
             });
             HideLoad();
+        });
+
+        $('form').on('submit', function(e) {
+            var isDoChecked = $('#is_do').is(':checked');
+            var customerCode = $.trim($('#customer_code').val());
+
+            if (isDoChecked && !customerCode) {
+                e.preventDefault();
+                noti('e', 'Validation Error', 'Customer Code is required when Is DO is checked.');
+                $('#customer_code').focus();
+                return false;
+            }
+
+            if (customerCode && !isDoChecked) {
+                e.preventDefault();
+                noti('e', 'Validation Error', 'Is DO must be checked when a Customer Code is provided.');
+                $('#is_do').focus();
+                return false;
+            }
         });
     </script>
 @endpush

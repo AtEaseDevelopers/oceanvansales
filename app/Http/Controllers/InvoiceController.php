@@ -22,6 +22,7 @@ use App\Models\Trip;
 use App\Models\Product;
 use App\Models\Task;
 use App\Models\Code;
+use App\Models\DeliveryOrder;
 use App\Traits\CalculatesCustomerCredit;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Session;
@@ -79,7 +80,7 @@ class InvoiceController extends AppBaseController
         $input['status'] = 1;
         if($input['invoiceno'] == null){
             $customer = Customer::find($input['customer_id']);
-            $input['invoiceno'] = Invoice::generateInvoiceNo($customer && $customer->isAneka());
+            $input['invoiceno'] = Invoice::generateInvoiceNo($customer && $customer->is_do);
         }
 
         if ($request->hasFile('attachment')) {
@@ -196,7 +197,7 @@ class InvoiceController extends AppBaseController
         $input['date'] = date_create($input['date']);
         if($input['invoiceno'] == null){
             $customer = Customer::find($input['customer_id']);
-            $input['invoiceno'] = Invoice::generateInvoiceNo($customer && $customer->isAneka());
+            $input['invoiceno'] = Invoice::generateInvoiceNo($customer && $customer->is_do);
         }
 
         if ($request->hasFile('attachment')) {
@@ -719,6 +720,7 @@ class InvoiceController extends AppBaseController
         ->with('customer')
         ->with('driver')
         ->with('invoicedetail.product')
+        ->with('invoicedetail.deliveryorder.customer')
         ->first();
 
         if (empty($invoice)) {
@@ -735,11 +737,48 @@ class InvoiceController extends AppBaseController
         ->select('companies.*')
         ->first() ?? null;
         $company = \App\Models\Company::find($invoice->company_id);
+
+        // Invoices produced via Delivery Order convert / combine-and-convert show a
+        // full A4 business-invoice layout (matching the company's external AutoCount
+        // export format) instead of the narrow receipt-style layout — each line's
+        // product name reads "{product name} - {source DO's customer_code}".
+        $isConvertedFromDo = DeliveryOrder::where('invoice_id', $id)->exists();
+        $view = $isConvertedFromDo ? 'invoices.print_converted' : 'invoices.print';
+
+        if ($isConvertedFromDo) {
+            // "Our D/O No." only makes sense when every line traces back to the same
+            // source Delivery Order (a plain 1:1 convert) — a combine-and-convert
+            // invoice has lines from multiple DOs, so it's left blank instead.
+            $sourceDoNumbers = $invoice->invoicedetail->pluck('deliveryorder.invoiceno')->filter()->unique();
+            $sourceDoNo = $sourceDoNumbers->count() === 1 ? $sourceDoNumbers->first() : null;
+
+            // Estimate the A4 page count from the row count so "Page X of Y" can be
+            // rendered as plain text (dompdf's counter(pages) only resolves inside
+            // @page margin boxes, not in normal flowing content).
+            $pageUsableHeightPt = 565;
+            $tableHeaderHeightPt = 20;
+            $rowHeightPt = 16;
+            $footerHeightPt = 140;
+            $rowCount = count($invoice['invoicedetail']);
+            $contentHeightPt = $tableHeaderHeightPt + ($rowCount * $rowHeightPt) + $footerHeightPt;
+            $totalPages = max(1, (int) ceil($contentHeightPt / $pageUsableHeightPt));
+        }
+
         try{
-            $pdf = Pdf::loadView('invoices.print', array(
+            $pdf = Pdf::loadView($view, [
                 'invoice' => $invoice,
                 'company' => $company,
-            ));
+                'sourceDoNo' => $sourceDoNo ?? null,
+                'totalPages' => $totalPages ?? 1,
+            ]);
+
+            if ($isConvertedFromDo) {
+                if($function == 'download'){
+                    return $pdf->setPaper('a4', 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true])->download('download.pdf');
+                }elseif($function == 'view'){
+                    return $pdf->setPaper('a4', 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true])->stream('view.pdf');
+                }
+            }
 
             if($function == 'download'){
                 return $pdf->setPaper(array(0, 0, 300, $height), 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true])->download('download.pdf');

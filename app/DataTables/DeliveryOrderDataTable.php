@@ -5,7 +5,6 @@ namespace App\DataTables;
 use App\Models\DeliveryOrder;
 use Yajra\DataTables\Services\DataTable;
 use Yajra\DataTables\EloquentDataTable;
-use Illuminate\Support\Facades\DB;
 
 class DeliveryOrderDataTable extends DataTable
 {
@@ -19,6 +18,16 @@ class DeliveryOrderDataTable extends DataTable
     {
         $dataTable = new EloquentDataTable($query);
 
+        $dataTable->addColumn('converted_invoice', function ($deliveryOrder) {
+            if (empty($deliveryOrder->invoice)) {
+                return '-';
+            }
+
+            return '<a href="' . route('invoices.show', encrypt($deliveryOrder->invoice->id)) . '">' . e($deliveryOrder->invoice->invoiceno) . '</a>';
+        });
+
+        $dataTable->rawColumns(['converted_invoice', 'action']);
+
         return $dataTable->addColumn('action', 'delivery_orders.datatables_actions');
     }
 
@@ -31,23 +40,13 @@ class DeliveryOrderDataTable extends DataTable
     public function query(DeliveryOrder $model)
     {
         return $model->newQuery()
+        ->with('customer')
         ->with('driver:id,name')
-        ->with('lorry:id,lorryno')
-        ->with('item:id,code')
-        ->with('vendor:id,code')
-        ->with('source:id,code')
-        ->with('destinate:id,code')
-        ->leftJoin('claims', function($join)
-        {
-            $join->on('deliveryorders.id', '=', 'claims.deliveryorder_id');
-        })
-        ->select('deliveryorders.id','deliveryorders.dono','deliveryorders.date','deliveryorders.driver_id','deliveryorders.lorry_id','deliveryorders.vendor_id','deliveryorders.source_id','deliveryorders.remark',
-        'deliveryorders.destinate_id','deliveryorders.item_id','deliveryorders.weight','deliveryorders.shipweight','deliveryorders.fees','deliveryorders.tol','deliveryorders.billingrate','deliveryorders.commissionrate','deliveryorders.status',
-        DB::raw('CONCAT(deliveryorders.id,":",deliveryorders.billingrate) as billingrate_data'),
-        DB::raw('CONCAT(deliveryorders.id,":",deliveryorders.commissionrate) as commissionrate_data'),
-        DB::raw('CONCAT(deliveryorders.id,":",COUNT(claims.id)) as claims'))
-        ->groupby('deliveryorders.id','deliveryorders.dono','deliveryorders.date','deliveryorders.driver_id','deliveryorders.lorry_id','deliveryorders.vendor_id','deliveryorders.source_id','deliveryorders.remark',
-        'deliveryorders.destinate_id','deliveryorders.item_id','deliveryorders.weight','deliveryorders.shipweight','deliveryorders.fees','deliveryorders.tol','deliveryorders.billingrate','deliveryorders.commissionrate','deliveryorders.status');
+        ->with('kelindan:id,name')
+        ->with('supervisor:id,name')
+        ->with('deliveryorderdetail')
+        ->with('invoice:id,invoiceno')
+        ->select('deliveryorders.*');
     }
 
     /**
@@ -60,35 +59,63 @@ class DeliveryOrderDataTable extends DataTable
         return $this->builder()
             ->columns($this->getColumns())
             ->minifiedAjax()
-            // ->addCheckbox([
-            //     'defaultContent' => '<input type="checkbox" />',
-            //     'title'          => '',
-            //     'data'           => 'checkbox',
-            //     'name'           => 'checkbox',
-            //     'orderable'      => false,
-            //     'searchable'     => false,
-            //     'exportable'     => false,
-            //     'printable'      => true,
-            //     'width'          => '10px',
-            // ])
-            ->addAction(['width' => '120px', 'printable' => false])
+            ->addAction(['title' => trans('delivery_orders.action'), 'printable' => false])
             ->parameters([
-                // 'dom'       => 'Bfrtip',
                 'dom'       => '<"row"B><"row"<"dataTableBuilderDiv"t>><"row"ip>',
                 'stateSave' => true,
                 'stateDuration' => 0,
                 'processing' => false,
-                'order'     => [[1, 'desc']],
+                'order'     => [[2, 'desc']],
                 'lengthMenu' => [[ 10, 50, 100, 300 ],[ '10 rows', '50 rows', '100 rows', '300 rows' ]],
-                'buttons'   => [
-                    ['extend' => 'create', 'className' => 'btn btn-default btn-sm no-corner',],
-                    ['extend' => 'print', 'className' => 'btn btn-default btn-sm no-corner',],
-                    ['extend' => 'reset', 'className' => 'btn btn-default btn-sm no-corner',],
-                    ['extend' => 'reload', 'className' => 'btn btn-default btn-sm no-corner',],
-                    ['extend' => 'excelHtml5','text'=>'<i class="fa fa-file-excel-o"></i> Excel','exportOptions'=> ['columns'=>':visible:not(:last-child)'], 'className' => 'btn btn-default btn-sm no-corner','title'=>null,'filename'=>'DO'.date('dmYHis')],
-                    ['extend' => 'pdfHtml5', 'orientation' => 'landscape', 'pageSize' => 'LEGAL','text'=>'<i class="fa fa-file-pdf-o"></i> PDF','exportOptions'=> ['columns'=>':visible:not(:last-child)'], 'className' => 'btn btn-default btn-sm no-corner','title'=>null,'filename'=>'DO'.date('dmYHis')],
-                    ['extend' => 'colvis', 'className' => 'btn btn-default btn-sm no-corner','text'=>'<i class="fa fa-columns"></i> Column',],
-                    ['extend' => 'pageLength','className' => 'btn btn-default btn-sm no-corner',],
+                'buttons' => [
+                    [
+                        'extend' => 'create',
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'text' => '<i class="fa fa-plus"></i> ' . trans('table_buttons.create'),
+                    ],
+                    [
+                        'extend' => 'print',
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'text' => '<i class="fa fa-print"></i> ' . trans('table_buttons.print'),
+                    ],
+                    [
+                        'extend' => 'reset',
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'text' => '<i class="fa fa-refresh"></i> ' . trans('table_buttons.reset'),
+                    ],
+                    [
+                        'extend' => 'reload',
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'text' => '<i class="fa fa-refresh"></i> ' . trans('table_buttons.reload'),
+                    ],
+                    [
+                        'extend' => 'excelHtml5',
+                        'text' => '<i class="fa fa-file-excel-o"></i> ' . trans('table_buttons.excel'),
+                        'exportOptions' => ['columns' => ':visible:not(:last-child)'],
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'title' => null,
+                        'filename' => 'delivery_order' . date('dmYHis')
+                    ],
+                    [
+                        'extend' => 'pdfHtml5',
+                        'orientation' => 'landscape',
+                        'pageSize' => 'LEGAL',
+                        'text' => '<i class="fa fa-file-pdf-o"></i> ' . trans('table_buttons.pdf'),
+                        'exportOptions' => ['columns' => ':visible:not(:last-child)'],
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'title' => null,
+                        'filename' => 'delivery_order' . date('dmYHis')
+                    ],
+                    [
+                        'extend' => 'colvis',
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'text' => '<i class="fa fa-columns"></i> ' . trans('table_buttons.column')
+                    ],
+                    [
+                        'extend' => 'pageLength',
+                        'className' => 'btn btn-default btn-sm no-corner',
+                        'text' => trans('table_buttons.show_10_rows')
+                    ],
                 ],
                 'columnDefs' => [
                     [
@@ -101,44 +128,26 @@ class DeliveryOrderDataTable extends DataTable
                         'render' => 'function(data, type){return "<input type=\'checkbox\' class=\'checkboxselect\' checkboxid=\'"+data+"\'/>";}'
                     ],
                     [
-                        'targets' => 9,
-                        'render' => 'function(data, type){return parseFloat(data).toFixed(2);}'
-                        ,'className' => 'dt-body-right'
+                        'targets' => 6,
+                        'visible' => true,
+                        'render' => 'function(data, type){var totalqty = 0; $.each(data,function(index,value){ totalqty=totalqty+parseInt(value.quantity) }); return totalqty;}'
                     ],
                     [
-                        'targets' => 10,
-                        'render' => 'function(data, type){return parseFloat(data).toFixed(2);}'
-                        ,'className' => 'dt-body-right'
+                    'targets' => 7,
+                    'render' => 'function(data, type, row){
+                            var map = {1:"Cash",2:"Credit",3:"Online BankIn",4:"E-wallet",5:"Cheque"};
+                            return map[data] || data || "";
+                        }'
                     ],
                     [
-                        'targets' => 11,
-                        'render' => 'function(data, type){return parseFloat(data).toFixed(2).split(".")[0].replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,") + (parseFloat(data).toFixed(2).split(".")[1] ? "." + parseFloat(data).toFixed(2).split(".")[1] : "");}'
-                        ,'className' => 'dt-body-right'
+                    'targets' => 8,
+                    'render' => 'function(data, type){var map = {1:"Completed",2:"Cancelled"}; return map[data] || "New";}'
                     ],
                     [
-                        'targets' => 12,
-                        'render' => 'function(data, type){return parseFloat(data).toFixed(2).split(".")[0].replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,") + (parseFloat(data).toFixed(2).split(".")[1] ? "." + parseFloat(data).toFixed(2).split(".")[1] : "");}'
-                        ,'className' => 'dt-body-right'
+                    'targets' => 9,
+                    'orderable' => false,
                     ],
-                    [
-                        'targets' => 13,
-                        'render' => 'function(data, type){return "<a href=\'#\' class=\'BillingRate\' dokey=\'"+data.split(":")[0]+"\'>"+parseFloat(data.split(":")[1]).toFixed(2).split(".")[0].replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,") + (parseFloat(data.split(":")[1]).toFixed(2).split(".")[1] ? "." + parseFloat(data.split(":")[1]).toFixed(2).split(".")[1] : "")+"</a>";}'
-                        ,'className' => 'dt-body-right'
-                    ],
-                    [
-                        'targets' => 14,
-                        'render' => 'function(data, type){return "<a href=\'#\' class=\'CommissionRate\' dokey=\'"+data.split(":")[0]+"\'>"+parseFloat(data.split(":")[1]).toFixed(2).split(".")[0].replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1,") + (parseFloat(data.split(":")[1]).toFixed(2).split(".")[1] ? "." + parseFloat(data.split(":")[1]).toFixed(2).split(".")[1] : "")+"</a>";}'
-                        ,'className' => 'dt-body-right'
-                    ],
-                    [
-                        'targets' => 15,
-                        'render' => 'function(data, type){return "<a href=\'#\' class=\'CountClaim\' dokey=\'"+data.split(":")[0]+"\'>"+data.split(":")[1]+"</a>";}'
-                        ,'className' => 'dt-body-center'
-                    ],
-                    [
-                        'targets' => 16,
-                        'render' => 'function(data, type){return data == 1 ? "Active" : "Unactive";}'
-                    ],
+
                 ],
                 'initComplete' => 'function(){
                     var columns = this.api().init().columns;
@@ -148,20 +157,21 @@ class DeliveryOrderDataTable extends DataTable
                         var column = this;
                         if(columns[index].searchable){
                             if(columns[index].title == \'Status\'){
-                                var input = \'<select class="border-0" style="width: 100%;"><option value="1">Active</option><option value="0">Unactive</option></select>\';
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="1">Completed</option><option value="2">Cancelled</option></select>\';
+                            }else if(columns[index].title == \'Payment Term\'){
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="1">Cash</option><option value="2">Credit</option><option value="3">Online BankIn</option><option value="4">E-wallet</option><option value="5">Cheque</option></select>\';
                             }else if(columns[index].title == \'Date\'){
                                 var input = \'<input type="text" id="\'+index+\'Date" onclick="searchDateColumn(this);" placeholder="Search ">\';
-                            }
-                            else{
+                            }else{
                                 var input = \'<input type="text" placeholder="Search ">\';
                             }
                             $(input).appendTo($(column.footer()).empty()).on(\'change\', function(){
                                 column.search($(this).val(),false,false).draw();
                                 ShowLoad();
                             })
-
                         }
                     });
+
                 }'
             ]);
     }
@@ -178,75 +188,65 @@ class DeliveryOrderDataTable extends DataTable
             'data' => 'id',
             'name' => 'id',
             'orderable' => false,
-            'searchable' => false]),
-            'date'=> new \Yajra\DataTables\Html\Column(['title' => 'Date',
-            'data' => 'date',
-            'name' => 'deliveryorders.date']),
-            'dono'=> new \Yajra\DataTables\Html\Column(['title' => 'DO Number',
-            'data' => 'dono',
-            'name' => 'dono']),
-            'driver_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Driver',
-            'data' => 'driver.name',
-            'name' => 'driver.name']),
-            'lorry_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Lorry',
-            'data' => 'lorry.lorryno',
-            'name' => 'lorry.lorryno']),
-            'vendor_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Vendor',
-            'data' => 'vendor.code',
-            'name' => 'vendor.code']),
-            'source_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Source',
-            'data' => 'source.code',
-            'name' => 'source.code']),
-            'destinate_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Destination',
-            'data' => 'destinate.code',
-            'name' => 'destinate.code']),
-            'item_id'=> new \Yajra\DataTables\Html\Column(['title' => 'Product',
-            'data' => 'item.code',
-            'name' => 'item.code']),
-            'weight'=> new \Yajra\DataTables\Html\Column(['title' => 'Source Weight',
-            'data' => 'weight',
-            'name' => 'deliveryorders.weight']),
-            'shipweight'=> new \Yajra\DataTables\Html\Column(['title' => 'Destination Weight',
-            'data' => 'shipweight',
-            'name' => 'deliveryorders.shipweight']),
-            'fees'=> new \Yajra\DataTables\Html\Column(['title' => 'Loading/Unloading Fees',
-            'data' => 'fees',
-            'name' => 'fees']),
-            'tol'=> new \Yajra\DataTables\Html\Column(['title' => 'Tol',
-            'data' => 'tol',
-            'name' => 'tol']),
-            'billingrate'=> new \Yajra\DataTables\Html\Column(['title' => 'Billing Rate',
-            'data' => 'billingrate_data',
-            'name' => 'deliveryorders.billingrate']),
-            'commissionrate'=> new \Yajra\DataTables\Html\Column(['title' => 'Commission Rate',
-            'data' => 'commissionrate_data',
-            'name' => 'deliveryorders.commissionrate']),
-            'claims'=> new \Yajra\DataTables\Html\Column(['title' => 'Claims',
-            'data' => 'claims',
-            'name' => 'claims',
-            'searchable' => false]),
-            'status',
-            'remark'=> new \Yajra\DataTables\Html\Column(['title' => 'Remark',
-            'data' => 'remark',
-            'name' => 'deliveryorders.remark']),
-            // 'STR_UDF1'=> new \Yajra\DataTables\Html\Column(['title' => 'String UDF1',
-            // 'data' => 'STR_UDF1',
-            // 'name' => 'STR_UDF1']),
-            // 'STR_UDF2'=> new \Yajra\DataTables\Html\Column(['title' => 'String UDF2',
-            // 'data' => 'STR_UDF2',
-            // 'name' => 'STR_UDF2']),
-            // 'STR_UDF3'=> new \Yajra\DataTables\Html\Column(['title' => 'String UDF3',
-            // 'data' => 'STR_UDF3',
-            // 'name' => 'STR_UDF3']),
-            // 'INT_UDF1'=> new \Yajra\DataTables\Html\Column(['title' => 'Integer UDF1',
-            // 'data' => 'INT_UDF1',
-            // 'name' => 'INT_UDF1']),
-            // 'INT_UDF2'=> new \Yajra\DataTables\Html\Column(['title' => 'Integer UDF2',
-            // 'data' => 'INT_UDF2',
-            // 'name' => 'INT_UDF2']),
-            // 'INT_UDF3'=> new \Yajra\DataTables\Html\Column(['title' => 'Integer UDF3',
-            // 'data' => 'INT_UDF3',
-            // 'name' => 'INT_UDF3']),
+            'searchable' => false
+            ]),
+
+            'invoiceno' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.do_no'),
+                'data' => 'invoiceno',
+                'name' => 'invoiceno'
+            ]),
+
+            'date' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.date'),
+                'data' => 'date',
+                'name' => 'date'
+            ]),
+
+            'customer_id' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.customer'),
+                'data' => 'customer.company',
+                'name' => 'customer.company'
+            ]),
+
+            'driver_id' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.driver'),
+                'data' => 'driver.name',
+                'name' => 'driver.name'
+            ]),
+
+            'kelindan_id' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.kelindan'),
+                'data' => 'kelindan.name',
+                'name' => 'kelindan.name'
+            ]),
+
+            'total' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.total_qty'),
+                'data' => 'deliveryorderdetail',
+                'name' => 'deliveryorderdetail',
+                'searchable' => false
+            ]),
+
+            'paymentterm' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.payment_term'),
+                'data' => 'paymentterm',
+                'name' => 'deliveryorders.paymentterm'
+            ]),
+
+            'status' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.status'),
+                'data' => 'status',
+                'name' => 'deliveryorders.status'
+            ]),
+
+            'converted_invoice' => new \Yajra\DataTables\Html\Column([
+                'title' => trans('delivery_orders.converted_to_invoice'),
+                'data' => 'converted_invoice',
+                'name' => 'converted_invoice',
+                'orderable' => false,
+                'searchable' => false
+            ]),
         ];
     }
 

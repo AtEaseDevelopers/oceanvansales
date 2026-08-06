@@ -33,17 +33,10 @@ class Customer extends Model
         'GroupDescription',
     ];
 
-    /**
-     * ANEKA-branded customer (e.g. "(BABY AIS) ANEKA ..." / "(AIS HANCUR) ANEKA ...").
-     * Invoices created for these customers get a "DO" prefix on their invoice number.
-     */
-    public function isAneka(): bool
-    {
-        return stripos($this->company, 'ANEKA') !== false;
-    }
-
     public $fillable = [
         'code',
+        'is_do',
+        'customer_code',
         'company',
         'chinese_name',
         'paymentterm',
@@ -76,6 +69,8 @@ class Customer extends Model
     protected $casts = [
         'id' => 'integer',
         'code' => 'string',
+        'is_do' => 'boolean',
+        'customer_code' => 'string',
         'company' => 'string',
         'paymentterm' => 'string',
         'group' => 'string',
@@ -106,7 +101,32 @@ class Customer extends Model
         'tin'              => 'nullable|string|max:255',
         'address_location' => 'nullable|string|max:2048',
         'waze_location'    => 'nullable|string|max:2048',
+        'is_do' => 'boolean',
+        'customer_code' => 'nullable|string|max:255',
     ];
+
+    /**
+     * Extra validation rules that can't live in the static $rules array above
+     * (PHP static property initializers can't contain closures) — is_do and
+     * customer_code must be filled in together, or both left blank.
+     *
+     * @return array
+     */
+    public static function pairedRules(): array
+    {
+        return [
+            'is_do' => [function ($attribute, $value, $fail) {
+                if ($value && empty(request('customer_code'))) {
+                    $fail('Customer Code is required when Is DO is checked.');
+                }
+            }],
+            'customer_code' => [function ($attribute, $value, $fail) {
+                if (!empty($value) && !request()->boolean('is_do')) {
+                    $fail('Is DO must be checked when a Customer Code is provided.');
+                }
+            }],
+        ];
+    }
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo

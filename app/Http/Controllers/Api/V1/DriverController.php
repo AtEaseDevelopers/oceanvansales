@@ -27,6 +27,8 @@ use App\Models\InventoryBalance;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
 use App\Models\foc;
+use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderDetail;
 use App\Models\DriverLocation;
 use App\Models\Language;
 use App\Models\MobileTranslationVersion;
@@ -1543,17 +1545,8 @@ class DriverController extends Controller
             ->with('driver')
             ->with('invoicepayment')
             ->first();
-            if(empty($invoice)){
-                return response()->json([
-                    'result' => false,
-                    'message' => __LINE__.$this->message_separator.'api.message.invoice_not_found',
-                    'data' => null
-                ], 200);
-            }else{
-               
-               
-                  
-            $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
+            if(!empty($invoice)){
+                $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
 
                 $invoice->customer->groupcompany = DB::table('companies')
                 ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
@@ -1562,9 +1555,78 @@ class DriverController extends Controller
                 return response()->json([
                     'result' => true,
                     'message' => __LINE__.$this->message_separator.'api.message.invoice_found',
+                    'type' => 'invoice',
                     'data' => $invoice
                 ], 200);
             }
+
+            // Not a real Invoice — the id may belong to a Delivery Order instead
+            // (is_do customers get a DO from the driver app, not an Invoice).
+            $deliveryOrder = DeliveryOrder::where('customer_id', $data['customer_id'])
+            ->where('id', $data['invoice_id'])
+            ->with('deliveryorderdetail.product')
+            ->with('customer')
+            ->with('driver')
+            ->first();
+
+            if(!empty($deliveryOrder)){
+                return response()->json([
+                    'result' => true,
+                    'message' => __LINE__.$this->message_separator.'api.message.invoice_found',
+                    'type' => 'delivery_order',
+                    'data' => $deliveryOrder
+                ], 200);
+            }
+
+            return response()->json([
+                'result' => false,
+                'message' => __LINE__.$this->message_separator.'api.message.invoice_not_found',
+                'data' => null
+            ], 200);
+        }
+        catch(Exception $e){
+            return response()->json([
+                'result' => false,
+                'message' => __LINE__.$this->message_separator.$e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
+
+    /**
+     * Returns the next invoice number and delivery order number, for both the
+     * online (server) sequence and the offline ("A"-marked) sequence — so the
+     * driver app can pre-fetch numbers to use while offline without colliding
+     * with whatever the server assigns once back online.
+     */
+    public function offlineData(Request $request){
+        try{
+            //check session
+            $driver = Driver::where('session', $request->header('session'))->first();
+            if(empty($driver)){
+                return response()->json([
+                    'result' => false,
+                    'message' => __LINE__.$this->message_separator.'api.message.invalid_session',
+                    'data' => null
+                ], 401);
+            }
+
+            $data = [
+                'invoice' => [
+                    'online' => Invoice::generateInvoiceNo(false),
+                    'offline' => Invoice::generateOfflineInvoiceNo(false),
+                ],
+                'delivery_order' => [
+                    'online' => DeliveryOrder::generateDoNo(),
+                    'offline' => DeliveryOrder::generateOfflineDoNo(),
+                ],
+            ];
+
+            return response()->json([
+                'result' => true,
+                'message' => __LINE__.$this->message_separator.'api.message.get_invoice_successfully',
+                'data' => $data
+            ], 200);
         }
         catch(Exception $e){
             return response()->json([
@@ -1677,6 +1739,111 @@ class DriverController extends Controller
                     'data' => null
                 ], 400);
             }
+            // Customers flagged is_do get a Delivery Order instead of an Invoice —
+            // it is later converted into a real Invoice via the web Delivery Order module.
+            if ($customer->is_do) {
+                DB::beginTransaction();
+                try {
+                    $doNo = $data['invoiceno'] ?? DeliveryOrder::generateDoNo();
+                    if (DeliveryOrder::where('invoiceno', $doNo)->exists()) {
+                        $doNo = DeliveryOrder::generateDoNo();
+                    }
+
+                    $deliveryOrder = new DeliveryOrder();
+                    $deliveryOrder->date = $data['date'] ?? date('Y-m-d H:i:s');
+                    $deliveryOrder->invoiceno = $doNo;
+                    $deliveryOrder->customer_id = $data['customer_id'];
+                    $deliveryOrder->driver_id = $trip->driver_id;
+                    $deliveryOrder->kelindan_id = $trip->kelindan_id;
+                    $deliveryOrder->agent_id = $customer->agent_id;
+                    $deliveryOrder->supervisor_id = $customer->supervisor_id;
+                    $deliveryOrder->paymentterm = $data['type'];
+                    $deliveryOrder->status = 1;
+                    $deliveryOrder->chequeno = $data['cheque_no'] ?? null;
+                    $deliveryOrder->remark = $data['remark'];
+                    $deliveryOrder->trip_id = $driver->trip_id;
+                    $deliveryOrder->save();
+
+                    foreach ($data['invoicedetail'] as $item) {
+                        $product = Product::where('id', $item['product_id'])->first();
+                        if (empty($product)) {
+                            DB::rollback();
+                            return response()->json([
+                                'result' => false,
+                                'message' => __LINE__.$this->message_separator.'api.message.invalid_product',
+                                'data' => null
+                            ], 400);
+                        }
+
+                        $deliveryorderdetail = new DeliveryOrderDetail();
+                        $deliveryorderdetail->deliveryorder_id = $deliveryOrder->id;
+                        $deliveryorderdetail->product_id = $item['product_id'];
+                        $deliveryorderdetail->quantity = $item['quantity'];
+                        $deliveryorderdetail->price = $item['price'];
+                        $deliveryorderdetail->totalprice = $item['quantity'] * $item['price'];
+                        if ($item['foc']) {
+                            $deliveryorderdetail->remark = "FOC";
+                        } else {
+                            $foc = Foc::where('customer_id', $customer->id)
+                                ->where('product_id', $item['product_id'])
+                                ->where('startdate', '<=', date('Y-m-d H:i:s'))
+                                ->where('enddate', '>', date('Y-m-d H:i:s'))
+                                ->where('status', 1)
+                                ->first();
+
+                            if ($foc) {
+                                $newAchieveQuantity = $foc->achievequantity + $item['quantity'];
+                                $newStatus = ($newAchieveQuantity >= $foc->quantity) ? 0 : 1;
+
+                                $foc->update([
+                                    'achievequantity' => $newAchieveQuantity,
+                                    'status' => $newStatus
+                                ]);
+                            }
+                        }
+                        $deliveryorderdetail->save();
+
+                        $inventorybalance = InventoryBalance::where('lorry_id', $trip->lorry_id)->where('product_id', $item['product_id'])->first();
+                        if (empty($inventorybalance)) {
+                            $newinventorybalance = new InventoryBalance();
+                            $newinventorybalance->lorry_id = $trip->lorry_id;
+                            $newinventorybalance->product_id = $item['product_id'];
+                            $newinventorybalance->quantity = 0 - $item['quantity'];
+                            $newinventorybalance->save();
+                        } else {
+                            $inventorybalance->quantity = $inventorybalance->quantity - $item['quantity'];
+                            $inventorybalance->save();
+                        }
+                        $inventorytransaction = new InventoryTransaction();
+                        $inventorytransaction->lorry_id = $trip->lorry_id;
+                        $inventorytransaction->product_id = $item['product_id'];
+                        $inventorytransaction->quantity = $item['quantity'] * -1;
+                        $inventorytransaction->type = 3;
+                        $inventorytransaction->user = $driver->employeeid . " (".$driver->name.")";
+                        $inventorytransaction->date = date('Y-m-d H:i:s');
+                        $inventorytransaction->save();
+                    }
+
+                    Task::where('customer_id', $data['customer_id'])->where('driver_id',$driver->id)->update(['status' => 8]);
+                    DB::commit();
+
+                    $do = DeliveryOrder::where('id', $deliveryOrder->id)->with('deliveryorderdetail.product')->first();
+
+                    return response()->json([
+                        'result' => true,
+                        'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                        'data' => $do
+                    ], 200);
+                } catch (Exception $e) {
+                    DB::rollback();
+                    return response()->json([
+                        'result' => false,
+                        'message' => __LINE__.$this->message_separator.$e->getMessage(),
+                        'data' => null
+                    ], 500);
+                }
+            }
+
             //process
             DB::beginTransaction();
             $extinvoice = Invoice::where('id',$data['invoice_id'])->where('status',0)->first();
@@ -1695,7 +1862,7 @@ class DriverController extends Controller
                 if($data['invoiceno'] != null){
                     $invoiceno = $data['invoiceno'];
                 }else{
-                    $invoiceno = Invoice::generateInvoiceNo($customer->isAneka());
+                    $invoiceno = Invoice::generateInvoiceNo($customer->is_do);
                 }
             }
             // Reject duplicate invoiceno within same company (BelongsToCompany scope applies automatically)
@@ -1890,12 +2057,127 @@ class DriverController extends Controller
                     continue;
                 }
 
+                // Customers flagged is_do get a Delivery Order instead of an Invoice —
+                // it is later converted into a real Invoice via the web Delivery Order module.
+                if ($customer->is_do) {
+                    DB::beginTransaction();
+
+                    $doNo = !empty($invoiceInput['invoiceno']) ? $invoiceInput['invoiceno'] : DeliveryOrder::generateDoNo();
+                    if (DeliveryOrder::where('invoiceno', $doNo)->exists()) {
+                        $doNo = DeliveryOrder::generateDoNo();
+                    }
+
+                    $deliveryOrder = new DeliveryOrder();
+                    $deliveryOrder->date = $invoiceInput['date'] ?? date('Y-m-d H:i:s');
+                    $deliveryOrder->invoiceno = $doNo;
+                    $deliveryOrder->customer_id = $customer->id;
+                    $deliveryOrder->driver_id = $trip->driver_id;
+                    $deliveryOrder->kelindan_id = $trip->kelindan_id;
+                    $deliveryOrder->agent_id = $customer->agent_id;
+                    $deliveryOrder->supervisor_id = $customer->supervisor_id;
+                    $deliveryOrder->paymentterm = $invoiceInput['type'];
+                    $deliveryOrder->status = 1;
+                    $deliveryOrder->chequeno = $invoiceInput['cheque_no'] ?? null;
+                    $deliveryOrder->remark = $invoiceInput['remark'] ?? null;
+                    $deliveryOrder->trip_id = $driver->trip_id;
+                    $deliveryOrder->save();
+
+                    $totalprice = 0;
+
+                    foreach ($invoiceInput['invoicedetail'] as $item) {
+                        $product = Product::where('id', $item['product_id'])->first();
+                        if (empty($product)) {
+                            DB::rollBack();
+                            $results[] = [
+                                'index'   => $index,
+                                'success' => false,
+                                'error'   => 'api.message.invalid_product',
+                                'input'   => $invoiceInput,
+                            ];
+                            continue 2;
+                        }
+
+                        $deliveryorderdetail = new DeliveryOrderDetail();
+                        $deliveryorderdetail->deliveryorder_id = $deliveryOrder->id;
+                        $deliveryorderdetail->product_id = $item['product_id'];
+                        $deliveryorderdetail->quantity = $item['quantity'];
+                        $deliveryorderdetail->price = $item['price'];
+                        $deliveryorderdetail->totalprice = $item['quantity'] * $item['price'];
+                        $totalprice += $deliveryorderdetail->totalprice;
+
+                        if ($item['foc']) {
+                            $deliveryorderdetail->remark = 'FOC';
+                        } else {
+                            $foc = Foc::where('customer_id', $customer->id)
+                                ->where('product_id', $item['product_id'])
+                                ->where('startdate', '<=', date('Y-m-d H:i:s'))
+                                ->where('enddate', '>', date('Y-m-d H:i:s'))
+                                ->where('status', 1)
+                                ->first();
+
+                            if ($foc) {
+                                $newAchieveQuantity = $foc->achievequantity + $item['quantity'];
+                                $foc->update([
+                                    'achievequantity' => $newAchieveQuantity,
+                                    'status'          => ($newAchieveQuantity >= $foc->quantity) ? 0 : 1,
+                                ]);
+                            }
+                        }
+
+                        $deliveryorderdetail->save();
+
+                        $inventorybalance = InventoryBalance::where('lorry_id', $trip->lorry_id)
+                            ->where('product_id', $item['product_id'])->first();
+                        if (empty($inventorybalance)) {
+                            $newinventorybalance             = new InventoryBalance();
+                            $newinventorybalance->lorry_id   = $trip->lorry_id;
+                            $newinventorybalance->product_id = $item['product_id'];
+                            $newinventorybalance->quantity   = 0 - $item['quantity'];
+                            $newinventorybalance->save();
+                        } else {
+                            $inventorybalance->quantity -= $item['quantity'];
+                            $inventorybalance->save();
+                        }
+
+                        $inventorytransaction             = new InventoryTransaction();
+                        $inventorytransaction->lorry_id   = $trip->lorry_id;
+                        $inventorytransaction->product_id = $item['product_id'];
+                        $inventorytransaction->quantity   = $item['quantity'] * -1;
+                        $inventorytransaction->type       = 3;
+                        $inventorytransaction->user       = $driver->employeeid . ' (' . $driver->name . ')';
+                        $inventorytransaction->date       = date('Y-m-d H:i:s');
+                        $inventorytransaction->save();
+                    }
+
+                    Task::where('customer_id', $customer->id)
+                        ->where('driver_id', $driver->id)
+                        ->update(['status' => 8]);
+
+                    DB::commit();
+
+                    $results[] = [
+                        'index'         => $index,
+                        'success'       => true,
+                        'invoiceno'     => $deliveryOrder->invoiceno,
+                        'invoice_id'    => $deliveryOrder->id,
+                        'date'          => $deliveryOrder->date,
+                        'customer_id'   => $deliveryOrder->customer_id,
+                        'customer_name' => $customer->company,
+                        'total'         => $totalprice,
+                        'paymentterm'   => $deliveryOrder->paymentterm,
+                        'status'        => $deliveryOrder->status,
+                        'payment_created' => false,
+                        'items_count'   => count($invoiceInput['invoicedetail']),
+                    ];
+                    continue;
+                }
+
                 DB::beginTransaction();
 
-                $invoiceno = !empty($invoiceInput['invoiceno']) ? $invoiceInput['invoiceno'] : Invoice::generateInvoiceNo($customer->isAneka());
+                $invoiceno = !empty($invoiceInput['invoiceno']) ? $invoiceInput['invoiceno'] : Invoice::generateInvoiceNo($customer->is_do);
 
                 if (Invoice::where('invoiceno', $invoiceno)->exists()) {
-                    $invoiceno = Invoice::generateInvoiceNo($customer->isAneka());
+                    $invoiceno = Invoice::generateInvoiceNo($customer->is_do);
                 }
 
                 $invoice               = new Invoice();
@@ -2071,42 +2353,88 @@ class DriverController extends Controller
             }
             
             $id = $data['invoice_id'];
-            
-            
+
+            $company = $driver->company;
+
             $invoice = Invoice::where('id',$id)
             ->with('customer')
             ->with('driver')
             ->with('invoicedetail.product')
+            ->with('invoicedetail.deliveryorder.customer')
             ->first();
-    
-            if (empty($invoice)) {
-                abort('404');
-            }
-    
-            $min = 450;
-            $each = 23;
-            $height = (count($invoice['invoicedetail']) * $each) + $min;
-    
-            $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
-            $invoice->customer->groupcompany = DB::table('companies')
-            ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
-            ->select('companies.*')
-            ->first() ?? null;
 
-            $company = $driver->company;
+            if (!empty($invoice)) {
+                $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
+                $invoice->customer->groupcompany = DB::table('companies')
+                ->where('companies.group_id',explode(',',$invoice->customer->group)[0])
+                ->select('companies.*')
+                ->first() ?? null;
 
-              $pdf = Pdf::loadView('invoices.print', array(
-                    'invoice' => $invoice,
+                // Invoices produced via Delivery Order convert / combine-and-convert use the
+                // full A4 business-invoice layout, same as the web print — see InvoiceController::getInvoiceViewPDF().
+                $isConvertedFromDo = DeliveryOrder::where('invoice_id', $id)->exists();
+
+                if ($isConvertedFromDo) {
+                    $sourceDoNumbers = $invoice->invoicedetail->pluck('deliveryorder.invoiceno')->filter()->unique();
+                    $sourceDoNo = $sourceDoNumbers->count() === 1 ? $sourceDoNumbers->first() : null;
+
+                    $pageUsableHeightPt = 565; $tableHeaderHeightPt = 20; $rowHeightPt = 16; $footerHeightPt = 140;
+                    $rowCount = count($invoice['invoicedetail']);
+                    $contentHeightPt = $tableHeaderHeightPt + ($rowCount * $rowHeightPt) + $footerHeightPt;
+                    $totalPages = max(1, (int) ceil($contentHeightPt / $pageUsableHeightPt));
+
+                    $pdf = Pdf::loadView('invoices.print_converted', [
+                        'invoice' => $invoice,
+                        'company' => $company,
+                        'sourceDoNo' => $sourceDoNo,
+                        'totalPages' => $totalPages,
+                    ]);
+                    $pdf->setPaper('a4', 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
+                } else {
+                    $min = 450;
+                    $each = 23;
+                    $height = (count($invoice['invoicedetail']) * $each) + $min;
+
+                    $pdf = Pdf::loadView('invoices.print', [
+                        'invoice' => $invoice,
+                        'company' => $company,
+                    ]);
+                    $pdf->setPaper(array(0, 0, 300, $height), 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
+                }
+
+                $invoiceFilename = 'invoice-' . $invoice->invoiceno . '.pdf';
+                $path = 'invoices-pdf/' . $invoiceFilename;
+
+                Storage::disk('public')->put($path, $pdf->output());
+                $url = url($path);
+            } else {
+                // Not a real Invoice — the id may belong to a Delivery Order instead.
+                $deliveryOrder = DeliveryOrder::where('id', $id)
+                ->with('customer')
+                ->with('driver')
+                ->with('deliveryorderdetail.product')
+                ->first();
+
+                if (empty($deliveryOrder)) {
+                    abort('404');
+                }
+
+                $min = 450;
+                $each = 23;
+                $height = (count($deliveryOrder['deliveryorderdetail']) * $each) + $min;
+
+                $pdf = Pdf::loadView('delivery_orders.print', [
+                    'deliveryOrder' => $deliveryOrder,
                     'company' => $company,
-                ));
-    
-            $pdf->setPaper(array(0, 0, 300, $height), 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
-    
-            $invoiceFilename = 'invoice-' . $invoice->invoiceno . '.pdf';
-            $path = 'invoices-pdf/' . $invoiceFilename;
-            
-            Storage::disk('public')->put($path, $pdf->output());
-            $url = url($path);
+                ]);
+                $pdf->setPaper(array(0, 0, 300, $height), 'portrait')->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
+
+                $doFilename = 'do-' . $deliveryOrder->invoiceno . '.pdf';
+                $path = 'invoices-pdf/' . $doFilename;
+
+                Storage::disk('public')->put($path, $pdf->output());
+                $url = url($path);
+            }
 
             return response()->json([
                 'result' => true,
@@ -4094,6 +4422,254 @@ class DriverController extends Controller
                                 <td>
                                     <p class="ta-r" style="font-size:18px;">@totalAmount</p>
                                 </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+            <br>
+            <br>
+            <br>
+            <br>
+            <br>
+            <hr style="border: none; border-top: 1px solid black;">
+        </body>
+
+        </html>
+        HTML;
+
+        return \Blade::render($html, ['company' => $company]);
+    }
+
+    public function DOHtml(Request $request){
+        try{
+            $data = $request->all();
+
+            // Check session
+            $driver = Driver::where('session', $request->header('session'))->first();
+            if(empty($driver)){
+                return response()->json([
+                    'result' => false,
+                    'message' => __LINE__.$this->message_separator.'api.message.invalid_session',
+                    'data' => null
+                ], 401);
+            }
+
+            $company = $driver->company;
+            $result = $this->getDOHtml($company);
+
+            return response()->json([
+                'result' => true,
+                'message' => __LINE__.$this->message_separator.'api.message.get_delivery_order_successfully',
+                'data' => $result
+            ], 200);
+        }
+        catch(Exception $e){
+            return response()->json([
+                'result' => false,
+                'message' => __LINE__.$this->message_separator.$e->getMessage(),
+                'data' => null
+            ], 500);
+        }
+    }
+
+    public function getDOHtml($company){
+        $html = <<<'HTML'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Delivery Order</title>
+            <style>
+                @page {
+                    margin-bottom:30px;
+                    margin-top:30px;
+                    margin-left:30px;
+                    margin-right:30px;
+                }
+                body{
+                    font-size: 14px;
+                    margin: 0%;
+                    font-family: Arial, Helvetica, sans-serif;
+                }
+                table{
+                    width: 100%;
+                    border-collapse: collapse;
+                    table-layout: fixed;
+                }
+                table th, table td{
+                    /* border: 1px solid black; */
+                    font-size: 12px;
+                }
+
+                .login-image{
+                    width: auto;
+                    height: 55px;
+                    background-size: contain;
+                    background-repeat: no-repeat;
+                    background-position: center;
+                    margin-bottom: 0.5rem;
+                }
+                .company{
+                    font-weight: bold;
+                    text-align: center;
+                }
+                .address{
+                    text-align: center;
+                }
+                p{
+                    margin: 0%;
+                }
+                .ta-r{
+                    text-align: right;
+                }
+                .ta-l{
+                    text-align: left;
+                }
+                .paidsummary{
+                    text-align: center;
+                    font-weight: bold;
+                    color: #394068;
+                }
+            </style>
+        </head>
+        <body>
+            <table class="invoice">
+
+                <tr>
+                    <td>
+                        <p class="company">{{ $company->name ?? '-' }}</p>
+                    </td>
+                </tr>
+                @if(!empty($company->ssm))
+                <tr>
+                    <td>
+                        <p class="address">({{ $company->ssm }})</p>
+                    </td>
+                </tr>
+                @endif
+                @if(!empty($company->tin))
+                <tr>
+                    <td>
+                        <p class="address">({{ $company->tin }})</p>
+                    </td>
+                </tr>
+                @endif
+                @if(!empty($company->address1))
+                <tr>
+                    <td>
+                        <p class="address">{{ $company->address1 }}</p>
+                    </td>
+                </tr>
+                @endif
+                @if(!empty($company->address2))
+                <tr>
+                    <td>
+                        <p class="address">{{ $company->address2 }}</p>
+                    </td>
+                </tr>
+                @endif
+                @if(!empty($company->address3))
+                <tr>
+                    <td>
+                        <p class="address">{{ $company->address3 }}</p>
+                    </td>
+                </tr>
+                @endif
+                @if(!empty($company->address4))
+                <tr>
+                    <td>
+                        <p class="address">{{ $company->address4 }}</p>
+                    </td>
+                </tr>
+                @endif
+
+                <tr>
+                    <td>
+                        <br>
+                        <table id="header">
+                            <tr>
+                                <td width="35%">
+                                    <p>Delivery Order</p>
+                                </td>
+                                <td width="65%">
+                                    <p class="ta-r">@deliveryOrderNo</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <p>Delivery Date</p>
+                                </td>
+                                <td>
+                                    <p class="ta-r">@deliveryDate</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <p>Payment Method</p>
+                                </td>
+                                <td>
+                                    <p class="ta-r">
+                                        @paymentTerm
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <p>Address</p>
+                                </td>
+                                <td>
+                                    <p class="ta-r">@customerAddress</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <p>Driver</p>
+                                </td>
+                                <td>
+                                    <p class="ta-r">@driverName</p>
+                                </td>
+                            </tr>
+                            
+                            <tr><td height="15">&nbsp;</td></tr>
+                            <tr>
+                                <td>
+                                    <p style="font-size:16px; font-weight:bold;">Customer</p>
+                                </td>
+                                <td>
+                                    <p class="ta-r" style="font-size:16px; font-weight:bold;">@companyName</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <br>
+                        <table id="detail">
+                            <tr>
+                                <th>
+                                    <p class="ta-l">Product</p>
+                                </th>
+                                <th>
+                                    <p class="ta-r">Qty</p>
+                                </th>
+                            </tr>
+                            @deliveryOrderItems
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <br>
+                        <table id="total">
+                            <tr>
+                                <th>
+                                    <p class="ta-l" style="font-size:18px;">Total Qty</p>
+                                </th>
+                                <th>
+                                    <p class="ta-r" style="font-size:18px;">@totalQuantity</p>
+                                </th>
                             </tr>
                         </table>
                     </td>

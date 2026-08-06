@@ -52,8 +52,10 @@ Route::group(['prefix' => 'v1'], function () {
     //Invoice
     Route::post('/driver/invoice', [App\Http\Controllers\Api\V1\DriverController::class, 'addinvoice']);
     Route::post('/driver/invoice/bulk-create', [App\Http\Controllers\Api\V1\DriverController::class, 'bulkCreateInvoice']);
+    Route::get('/driver/invoice/offline-data', [App\Http\Controllers\Api\V1\DriverController::class, 'offlineData']);
     Route::post('/driver/invoice/pdf', [App\Http\Controllers\Api\V1\DriverController::class, 'invoicepdf']);
     Route::get('/driver/invoice/html', [App\Http\Controllers\Api\V1\DriverController::class, 'InvoiceHtml']);
+    Route::get('/driver/deliveryOrder/html', [App\Http\Controllers\Api\V1\DriverController::class, 'DoHtml']);
 
      //Invoice Payment
     Route::post('/driver/invoicepayment', [App\Http\Controllers\Api\V1\DriverController::class, 'addpayment']);

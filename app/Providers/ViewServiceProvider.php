@@ -314,32 +314,30 @@ class ViewServiceProvider extends ServiceProvider
         });
 
         View::composer(['delivery_orders.fields'], function ($view) {
-            $priceItems = Price::where('status',1)->select('vendor_id','item_id','source_id','destinate_id','minrange','maxrange','billingrate')->get();
-            $view->with('priceItems', $priceItems);
+            $supervisorItems = Supervisor::pluck('name','id')->toArray();
+            $view->with('supervisorItems', $supervisorItems);
         });
         View::composer(['delivery_orders.fields'], function ($view) {
-            $itemItems = Item::where('status',1)->pluck('code','id')->toArray();
-            $view->with('itemItems', $itemItems);
+            $agentItems = Agent::pluck('name','id')->toArray();
+            $view->with('agentItems', $agentItems);
         });
         View::composer(['delivery_orders.fields'], function ($view) {
-            $sourceItems = Location::where('source',1)->where('status',1)->pluck('code','id')->toArray();
-            $view->with('sourceItems', $sourceItems);
+            $kelindanItems = Kelindan::pluck('name','id')->toArray();
+            $view->with('kelindanItems', $kelindanItems);
         });
         View::composer(['delivery_orders.fields'], function ($view) {
-            $destinateItems = Location::where('destination',1)->where('status',1)->pluck('code','id')->toArray();
-            $view->with('destinateItems', $destinateItems);
-        });
-        View::composer(['delivery_orders.fields'], function ($view) {
-            $vendorItems = Vendor::where('status',1)->pluck('code','id')->toArray();
-            $view->with('vendorItems', $vendorItems);
-        });
-        View::composer(['delivery_orders.fields'], function ($view) {
-            $driverItems = Driver::where('status',1)->pluck('name','id')->toArray();
+            $driverItems = Driver::orderBy("name")->pluck('name','id')->toArray();
             $view->with('driverItems', $driverItems);
         });
         View::composer(['delivery_orders.fields'], function ($view) {
-            $lorryItems = Lorry::pluck('lorryno','id')->toArray();
-            $view->with('lorryItems', $lorryItems);
+            $customerItems = Customer::where('is_do', true)->orderBy("company")->pluck('company','id')->toArray();
+            $customerPaymentTerms = Customer::pluck('paymentterm','id')->toArray();
+            $view->with('customerItems', $customerItems);
+            $view->with('customerPaymentTerms', $customerPaymentTerms);
+        });
+        View::composer(['delivery_order_details.fields','delivery_orders.detail'], function ($view) {
+            $productItems = Product::pluck('name','id')->toArray();
+            $view->with('productItems', $productItems);
         });
 
         View::composer(['loanpayments.fields'], function ($view) {

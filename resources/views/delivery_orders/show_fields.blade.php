@@ -1,134 +1,84 @@
+<div class="row">
+<div class="{{ $deliveryOrder->attachment ? 'col-sm-8' : 'col-sm-12' }}">
+
+<!-- Invoiceno Field -->
+<div class="form-group">
+    {!! Form::label('invoiceno', __('delivery_orders.do_no')) !!}:<span class="asterisk"> *</span>
+    <p>{{ $deliveryOrder->invoiceno }}</p>
+</div>
+
 <!-- Date Field -->
 <div class="form-group">
-    {!! Form::label('date', 'Date:') !!}
+    {!! Form::label('date', __('delivery_orders.date')) !!}:<span class="asterisk"> *</span>
     <p>{{ $deliveryOrder->date }}</p>
 </div>
 
-<!-- Dono Field -->
+<!-- Customer Id Field -->
 <div class="form-group">
-    {!! Form::label('dono', 'Do Number:') !!}
-    <p>{{ $deliveryOrder->dono }}</p>
+    {!! Form::label('customer_id', __('delivery_orders.customer')) !!}:<span class="asterisk"> *</span>
+    <p>{{ $deliveryOrder->customer->company ?? '' }}</p>
 </div>
 
 <!-- Driver Id Field -->
 <div class="form-group">
-    {!! Form::label('driver_id', 'Driver:') !!}
-    <p>{{ $deliveryOrder->driver->name }}</p>
+    {!! Form::label('driver_id', __('delivery_orders.driver')) !!}:
+    <p>{{ $deliveryOrder->driver->name ?? '' }}</p>
 </div>
 
-<!-- Lorry Id Field -->
+<!-- Kelindan Id Field -->
 <div class="form-group">
-    {!! Form::label('lorry_id', 'Lorry:') !!}
-    <p>{{ $deliveryOrder->lorry->lorryno }}</p>
+    {!! Form::label('kelindan_id', __('delivery_orders.kelindan')) !!}:
+    <p>{{ $deliveryOrder->kelindan->name ?? '' }}</p>
 </div>
 
-<!-- Vendor Id Field -->
+<!-- Agent Id Field -->
 <div class="form-group">
-    {!! Form::label('vendor_id', 'Vendor:') !!}
-    <p>{{ $deliveryOrder->vendor->code }}</p>
+    {!! Form::label('agent_id', __('delivery_orders.agent')) !!}:
+    <p>{{ $deliveryOrder->agent->name ?? '' }}</p>
 </div>
 
-<!-- Source Id Field -->
+<!-- Paymentterm Field -->
 <div class="form-group">
-    {!! Form::label('source_id', 'Source:') !!}
-    <p>{{ $deliveryOrder->source->code }}</p>
-</div>
-
-<!-- Destinate Id Field -->
-<div class="form-group">
-    {!! Form::label('destinate_id', 'Destination:') !!}
-    <p>{{ $deliveryOrder->destinate->code }}</p>
-</div>
-
-<!-- Item Id Field -->
-<div class="form-group">
-    {!! Form::label('item_id', 'Product:') !!}
-    <p>{{ $deliveryOrder->item->code }}</p>
-</div>
-
-<!-- Weight Field -->
-<div class="form-group">
-    {!! Form::label('weight', 'Source Weight:') !!}
-    <p>{{ number_format($deliveryOrder->weight,2,'.','') }}</p>
-</div>
-
-<!-- Shipweight Field -->
-<div class="form-group">
-    {!! Form::label('shipweight', 'Destination Weight:') !!}
-    <p>{{ number_format($deliveryOrder->shipweight,2,'.','') }}</p>
-</div>
-
-<!-- Fees Field -->
-<div class="form-group">
-    {!! Form::label('fees', 'Loading/Unloading Fees:') !!}
-    <p>{{ number_format($deliveryOrder->fees,2,'.','') }}</p>
-</div>
-
-<!-- Tol Field -->
-<div class="form-group">
-    {!! Form::label('tol', 'Tol:') !!}
-    <p>{{ number_format($deliveryOrder->tol,2,'.','') }}</p>
-</div>
-
-<!-- Billingrate Field -->
-<div class="form-group">
-    {!! Form::label('billingrate', 'Billing Rate:') !!}
-    <p>{{ number_format($deliveryOrder->billingrate,2,'.','') }}</p>
-</div>
-
-<!-- Commissionrate Field -->
-<div class="form-group">
-    {!! Form::label('billingrate', 'Commission Rate:') !!}
-    <p>{{ number_format($deliveryOrder->commissionrate,2,'.','') }}</p>
+    {!! Form::label('paymentterm', __('delivery_orders.payment_term')) !!}:
+    <p>{{ \App\Models\Customer::PAYMENT_TERMS[$deliveryOrder->paymentterm] ?? 'Unknown' }}</p>
 </div>
 
 <!-- Status Field -->
 <div class="form-group">
-    {!! Form::label('status', 'Status:') !!}
-    <p>{{ $deliveryOrder->status == 1 ? "Active" : "Unactive" }}</p>
+    {!! Form::label('status', __('delivery_orders.status')) !!}:<span class="asterisk"> *</span>
+    <p>{{ $deliveryOrder->status == 2 ? "Cancelled" : ($deliveryOrder->status == 1 ? "Completed" : "New") }}</p>
 </div>
 
 <!-- Remark Field -->
 <div class="form-group">
-    {!! Form::label('remark', 'Remark:') !!}
+    {!! Form::label('remark', __('delivery_orders.remark')) !!}:
     <p>{{ $deliveryOrder->remark }}</p>
 </div>
 
-{{-- <!-- Str Udf1 Field -->
+<!-- Converted Invoice -->
 <div class="form-group">
-    {!! Form::label('STR_UDF1', 'String UDF1:') !!}
-    <p>{{ $deliveryOrder->STR_UDF1 }}</p>
+    {!! Form::label('invoice_id', __('delivery_orders.converted_to_invoice')) !!}:
+    <p>
+        @if($deliveryOrder->invoice)
+            <a href="{{ route('invoices.show', encrypt($deliveryOrder->invoice_id)) }}">{{ $deliveryOrder->invoice->invoiceno }}</a>
+        @else
+            -
+        @endif
+    </p>
 </div>
 
-<!-- Str Udf2 Field -->
-<div class="form-group">
-    {!! Form::label('STR_UDF2', 'String UDF2:') !!}
-    <p>{{ $deliveryOrder->STR_UDF2 }}</p>
-</div>
+</div>{{-- end left col --}}
 
-<!-- Str Udf3 Field -->
-<div class="form-group">
-    {!! Form::label('STR_UDF3', 'String UDF3:') !!}
-    <p>{{ $deliveryOrder->STR_UDF3 }}</p>
+@if($deliveryOrder->attachment)
+<div class="col-sm-4 text-center">
+    <label>Attachment</label>
+    <div>
+        <img src="{{ asset('/' . $deliveryOrder->attachment) }}" class="img-fluid img-thumbnail" style="max-height: 350px;">
+    </div>
 </div>
+@endif
 
-<!-- Int Udf1 Field -->
-<div class="form-group">
-    {!! Form::label('INT_UDF1', 'Integer UDF1:') !!}
-    <p>{{ $deliveryOrder->INT_UDF1 }}</p>
-</div>
-
-<!-- Int Udf2 Field -->
-<div class="form-group">
-    {!! Form::label('INT_UDF2', 'Integer UDF2:') !!}
-    <p>{{ $deliveryOrder->INT_UDF2 }}</p>
-</div>
-
-<!-- Int Udf3 Field -->
-<div class="form-group">
-    {!! Form::label('INT_UDF3', 'Integer UDF3:') !!}
-    <p>{{ $deliveryOrder->INT_UDF3 }}</p>
-</div> --}}
+</div>{{-- end row --}}
 
 @push('scripts')
     <script>

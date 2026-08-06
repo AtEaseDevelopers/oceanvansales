@@ -119,6 +119,11 @@ class Invoice extends Model
         return $this->hasMany(\App\Models\InvoiceDetail::class);
     }
 
+    public function deliveryorders()
+    {
+        return $this->hasMany(\App\Models\DeliveryOrder::class, 'invoice_id');
+    }
+
     public function invoicepayment()
     {
         return $this->hasMany(\App\Models\InvoicePayment::class);
@@ -139,16 +144,16 @@ class Invoice extends Model
      * Format: {PREFIX}{YY}{MM}/{SEQUENCE} e.g. OS2606/00001
      * Sequence is per-company per-month, auto-expands beyond 5 digits if needed.
      *
-     * When $isAneka is true, a "DO" prefix is added in front of the whole number
-     * (e.g. DOOC2607/00001). DO-prefixed (ANEKA) invoices run their own independent
-     * sequence counter, separate from regular invoices — the lookup pattern includes
-     * the DO prefix so it only matches prior invoices of the same kind.
+     * When $isDo is true, a "DO" prefix is added in front of the whole number
+     * (e.g. DOOC2607/00001). DO-prefixed (customer.is_do) invoices run their own
+     * independent sequence counter, separate from regular invoices — the lookup
+     * pattern includes the DO prefix so it only matches prior invoices of the same kind.
      */
-    public static function generateInvoiceNo(bool $isAneka = false): string
+    public static function generateInvoiceNo(bool $isDo = false): string
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
-        $invoicePrefix = $isAneka ? 'DO' . $prefix : $prefix;
+        $invoicePrefix = $isDo ? 'DO' . $prefix : $prefix;
         $yy = date('y');
         $mm = date('m');
         $pattern = $invoicePrefix . $yy . $mm . '/%';
@@ -165,6 +170,38 @@ class Invoice extends Model
         $digits = max(5, strlen((string) $nextSeq));
 
         return $invoicePrefix . $yy . $mm . '/' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Generate the next OFFLINE invoice number for the current company and month.
+     * Format: {PREFIX}{YY}{MM}/A{SEQUENCE} e.g. OC2608/A00081
+     * Used by the driver app when it creates an invoice while offline, so it never
+     * collides with the server-assigned online sequence from generateInvoiceNo() —
+     * the "A" marker keeps the two sequences independent (and the numeric-cast used
+     * to find the last online sequence naturally ignores "A..." rows since they
+     * cast to 0, so offline numbers never interfere with online numbering either).
+     */
+    public static function generateOfflineInvoiceNo(bool $isDo = false): string
+    {
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+        $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
+        $invoicePrefix = $isDo ? 'DO' . $prefix : $prefix;
+        $yy = date('y');
+        $mm = date('m');
+        $pattern = $invoicePrefix . $yy . $mm . '/A%';
+
+        $lastInvoice = static::where('invoiceno', 'LIKE', $pattern)
+            ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/A', invoiceno) + 2) AS UNSIGNED) DESC")
+            ->first();
+
+        $lastSeq = $lastInvoice
+            ? intval(substr($lastInvoice->invoiceno, strpos($lastInvoice->invoiceno, '/A') + 2))
+            : 0;
+
+        $nextSeq = $lastSeq + 1;
+        $digits = max(5, strlen((string) $nextSeq));
+
+        return $invoicePrefix . $yy . $mm . '/A' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
     }
 
     public function getDateAttribute($value)

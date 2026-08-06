@@ -22,6 +22,18 @@
     <p>{{ $customer->group ?? '' }}</p>
 </div>
 
+<!-- Customer Code Field -->
+<div class="form-group">
+    {!! Form::label('customer_code', 'Customer Code:') !!}
+    <p>{{ $customer->customer_code ?? '-' }}</p>
+</div>
+
+<!-- Is DO Field -->
+<div class="form-group">
+    {!! Form::label('is_do', 'Is DO:') !!}
+    <p>{{ $customer->is_do ? 'Yes' : 'No' }}</p>
+</div>
+
 <!-- Agent Id Field -->
 <div class="form-group">
     {!! Form::label('agent_id', __('customers.agent')) !!}:

@@ -1,4 +1,4 @@
-{{-- @canany(['deliveryorder'])
+@canany(['deliveryorder'])
 <li class="nav-item {{ Request::is('deliveryOrders*') ? 'active' : '' }}">
     <a class="nav-link {{ Request::is('deliveryOrders*') ? 'active' : '' }}" href="{{ route('deliveryOrders.index') }}">
         <i class="nav-icon icon-notebook"></i>
@@ -7,7 +7,7 @@
 </li>
 @endcanany
 
-@canany(['loan','loanpayment'])
+{{-- @canany(['loan','loanpayment'])
 <li class="nav-item nav-dropdown {{ Request::is('loans*','loanpayments*') ? 'open' : '' }}">
     <a class="nav-link nav-dropdown-toggle" href="#">
         <i class="nav-icon icon-diamond"></i>

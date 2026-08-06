@@ -7,7 +7,7 @@
 @push('scripts')
     @include('layouts.datatables_js')
     {!! $dataTable->scripts() !!}
-    
+
     <script>
         $(document).ready(function () {
 
@@ -28,152 +28,6 @@
                 $('#dataTableBuilder').resizableColumns();
             }
         });
-    </script>
-@endpush
-
-
-@push('scripts')
-    <script>
-        window.checkboxid = [];
-        $(document).on("change", ".checkboxselect", function(e){
-            if(this.checked){
-                addcheckboxid($(this).attr('checkboxid'));
-            }
-            else{
-                removecheckboxid($(this).attr('checkboxid'));
-            }
-            checkcheckbox();
-        });
-        $(document).on("change", "#selectallcheckbox", function(e){
-            var checkall = this.checked;
-            $('.checkboxselect').each(function(i, obj) {
-                if(checkall){
-                    if(!obj.checked){
-                        addcheckboxid($(obj).attr('checkboxid'));
-                        $(obj).prop( "checked", checkall );
-                    }
-                }else{
-                    if(obj.checked){
-                        removecheckboxid($(obj).attr('checkboxid'));
-                        $(obj).prop( "checked", checkall );
-                    }
-                }
-            });
-        });
-
-        $(document).on("click", ".CountClaim", function(e){
-            if($(this).text() == '0'){
-                noti('i','Info','No claim can be show...')
-                return;
-            }
-            getClaimInfo($(this).attr("dokey"));
-        });
-        $(document).on("click", ".BillingRate", function(e){
-            getBillingRateInfo($(this).attr("dokey"));
-        });
-        $(document).on("click", ".CommissionRate", function(e){
-            getCommissionRateInfo($(this).attr("dokey"));
-        });
-        function getClaimInfo(dokey){
-            ShowLoad();
-            $.ajax({
-                url: "{{config('app.url')}}/deliveryOrders/getClaimInfo",
-                type:"POST",
-                data:{
-                dokey: dokey
-                ,_token: "{{ csrf_token() }}"
-                },
-                success:function(response){
-                    var body = getTableCode(response);
-
-                    $('#infoModel').on('show.bs.modal', function (event) {
-                        var modal = $(this)
-                        modal.find('.modal-title').text('Claims')
-                        modal.find('.modal-body').html(body)
-                    })
-                    $('#infoModel').modal('show')
-                    HideLoad();
-                },
-                error: function(error) {
-                    noti('e','Please contact your administrator',error.responseJSON.message)
-                    HideLoad();
-                }
-            });
-        }
-
-        function getBillingRateInfo(dokey){
-            ShowLoad();
-            $.ajax({
-                url: "{{config('app.url')}}/deliveryOrders/getBillingRateInfo",
-                type:"POST",
-                data:{
-                dokey: dokey
-                ,_token: "{{ csrf_token() }}"
-                },
-                success:function(response){
-                    var body = getTableCode(response);
-
-                    $('#infoModel').on('show.bs.modal', function (event) {
-                        var modal = $(this)
-                        modal.find('.modal-title').text('Billing Rate Details')
-                        modal.find('.modal-body').html(body)
-                    })
-                    $('#infoModel').modal('show')
-                    HideLoad();
-                },
-                error: function(error) {
-                    noti('e','Please contact your administrator',error.responseJSON.message)
-                    HideLoad();
-                }
-            });
-        }
-
-        function getCommissionRateInfo(dokey){
-            ShowLoad();
-            $.ajax({
-                url: "{{config('app.url')}}/deliveryOrders/getCommissionRateInfo",
-                type:"POST",
-                data:{
-                dokey: dokey
-                ,_token: "{{ csrf_token() }}"
-                },
-                success:function(response){
-                    var body = getTableCode(response);
-
-                    $('#infoModel').on('show.bs.modal', function (event) {
-                        var modal = $(this)
-                        modal.find('.modal-title').text('Commission Rate Details')
-                        modal.find('.modal-body').html(body)
-                    })
-                    $('#infoModel').modal('show')
-                    HideLoad();
-                },
-                error: function(error) {
-                    noti('e','Please contact your administrator',error.responseJSON.message)
-                    HideLoad();
-                }
-            });
-        }
-
-        function getTableCode(data)
-        {
-            var tbl  = document.createElement("table");
-            tbl.className = "table table-sm table-striped";
-            var tr = tbl.insertRow(-1);
-            $.each( data[0], function( key, value ) {
-                var td = tr.insertCell();
-                td.appendChild(document.createTextNode(key.charAt(0).toUpperCase() + key.slice(1)));
-            });
-            for (var i = 0; i < data.length; ++i)
-            {
-                var tr = tbl.insertRow();
-                $.each( data[i], function( key, value ) {
-                    var td = tr.insertCell();
-                    td.appendChild(document.createTextNode(value.toString()));
-                });
-            }
-            return tbl;
-        }
 
         function searchDateColumn(i){
             $('#columnid').val(i.id);
@@ -198,7 +52,7 @@
             var endDateParts = $('#datetomodel').val().split("-");
             var currentDate = new Date(+currentDateParts[2], currentDateParts[1] - 1, +currentDateParts[0]);
             var endDate = new Date(+endDateParts[2], endDateParts[1] - 1, +endDateParts[0]);
-                
+
             while (currentDate <= endDate) {
                 dateArray=dateArray+moment(currentDate).format("YYYY-MM-DD")+'|';
                 currentDate.setUTCDate(currentDate.getUTCDate() + steps);
@@ -228,18 +82,41 @@
             }
         }, cb);
 
+        window.checkboxid = [];
+        $(document).on("change", ".checkboxselect", function(e){
+            if(this.checked){
+                addcheckboxid($(this).attr('checkboxid'));
+            }
+            else{
+                removecheckboxid($(this).attr('checkboxid'));
+            }
+            checkcheckbox();
+        });
+        $(document).on("change", "#selectallcheckbox", function(e){
+            var checkall = this.checked;
+            $('.checkboxselect').each(function(i, obj) {
+                if(checkall){
+                    if(!obj.checked){
+                        addcheckboxid($(obj).attr('checkboxid'));
+                        $(obj).prop( "checked", checkall );
+                    }
+                }else{
+                    if(obj.checked){
+                        removecheckboxid($(obj).attr('checkboxid'));
+                        $(obj).prop( "checked", checkall );
+                    }
+                }
+            });
+        });
         function addcheckboxid(checkboxid){
             window.checkboxid.push(checkboxid);
-            // console.log(window.checkboxid);
         }
         function removecheckboxid(checkboxid){
             window.checkboxid = jQuery.grep(window.checkboxid, function(value) {
                 return value != checkboxid;
             });
-            // console.log(window.checkboxid);
         }
         function setcheckbox(checkboxids){
-            // console.log(checkboxid);
             for (i = 0; i < checkboxids.length; ++i) {
                 $('input[class="checkboxselect"][checkboxid="'+checkboxids[i]+'"]').prop( "checked", true );
             }
@@ -265,7 +142,7 @@
     <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title" id="infoModelLabel">Select a date range</h5>
+          <h5 class="modal-title" id="infoModelLabel">{{ __('delivery_orders.select_a_date_range') }}</h5>
           <button type="button" class="close" data-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">&times;</span>
           </button>
@@ -275,7 +152,7 @@
             <input id="datefrommodel" type="hidden" value="">
             <input id="datetomodel" type="hidden" value="">
             <div class="form-group col-sm-12">
-                <label for="datefrommodel">Date:</label>
+                <label for="datefrommodel">{{ __('delivery_orders.date') }}:</label>
                 <div id="reportrange" style="background: #fff; cursor: pointer; padding: 5px 10px; border: 1px solid #ccc; width: 100%">
                     <i class="fa fa-calendar"></i>&nbsp;
                     <span></span> <i class="fa fa-caret-down"></i>
@@ -283,30 +160,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button type="button" class="btn btn-primary" onclick="dateRange();">Search</button>
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        </div>
-      </div>
-    </div>
-</div>
-
-<div class="modal fade" id="infoModel" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="infoModelLabel">Modal title</h5>
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="modal-body">
-            <div class="form-group col-sm-12">
-                <label for="dono">DO Number:</label>
-                <input class="form-control" type="text" disabled value="value">
-            </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="dateRange();">{{ __('delivery_orders.search') }}</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('delivery_orders.close') }}</button>
         </div>
       </div>
     </div>

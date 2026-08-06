@@ -6,88 +6,35 @@ use Eloquent as Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use App\Traits\BelongsToCompany;
+use App\Models\Company;
 
-/**
- * Class DeliveryOrder
- * @package App\Models
- * @version August 13, 2022, 2:11 pm UTC
- *
- * @property \App\Models\Location $destinate
- * @property \App\Models\Item $item
- * @property \App\Models\Location $source
- * @property \App\Models\Driver $driver
- * @property \App\Models\Lorry $lorry
- * @property \App\Models\Vendor $vendor
- * @property string $dono
- * @property string|\Carbon\Carbon $date
- * @property integer $driver_id
- * @property integer $lorry_id
- * @property integer $vendor_id
- * @property integer $source_id
- * @property integer $destinate_id
- * @property integer $item_id
- * @property number $weight
- * @property number $shipweight
- * @property number $fees
- * @property number $tol
- * @property number $billingrate
- * @property number $commissionrate
- * @property integer $status
- * @property string $remark
- * @property integer $calstatus
- * @property string $STR_UDF1
- * @property string $STR_UDF2
- * @property string $STR_UDF3
- * @property integer $INT_UDF1
- * @property integer $INT_UDF2
- * @property integer $INT_UDF3
- */
 class DeliveryOrder extends Model
 {
     // use SoftDeletes;
 
-    use HasFactory;
+    use HasFactory, BelongsToCompany;
 
     public $table = 'deliveryorders';
-    
+
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
 
-
-    protected $dates = ['deleted_at'];
-
-
-
     public $fillable = [
-        'dono',
+        'invoiceno',
         'date',
+        'customer_id',
         'driver_id',
-        'lorry_id',
-        'vendor_id',
-        'source_id',
-        'destinate_id',
-        'item_id',
-        'weight',
-        'shipweight',
-        'fees',
-        'tol',
-        'billingrate',
-        'commissionrate',
+        'kelindan_id',
+        'agent_id',
+        'supervisor_id',
+        'paymentterm',
         'status',
         'remark',
-        'calstatus',
-        'STR_UDF1',
-        'STR_UDF2',
-        'STR_UDF3',
-        'INT_UDF1',
-        'INT_UDF2',
-        'INT_UDF3'
-    ];
-
-    protected $attributes = [
-        'fees' => 0.00,
-        'tol' => 0.00,
-        'calstatus' => 1
+        'chequeno',
+        'attachment',
+        'trip_id',
+        'invoice_id',
     ];
 
     /**
@@ -97,29 +44,19 @@ class DeliveryOrder extends Model
      */
     protected $casts = [
         'id' => 'integer',
-        'dono' => 'string',
+        'invoiceno' => 'string',
         'date' => 'date:d-m-Y',
+        'customer_id' => 'integer',
         'driver_id' => 'integer',
-        'lorry_id' => 'integer',
-        'vendor_id' => 'integer',
-        'source_id' => 'integer',
-        'destinate_id' => 'integer',
-        'item_id' => 'integer',
-        'weight' => 'float',
-        'shipweight' => 'float',
-        'fees' => 'float',
-        'tol' => 'float',
-        'billingrate' => 'float',
-        'commissionrate' => 'float',
+        'kelindan_id' => 'integer',
+        'agent_id' => 'integer',
+        'supervisor_id' => 'integer',
+        'paymentterm' => 'string',
         'status' => 'integer',
         'remark' => 'string',
-        'calstatus;' => 'integer',
-        'STR_UDF1' => 'string',
-        'STR_UDF2' => 'string',
-        'STR_UDF3' => 'string',
-        'INT_UDF1' => 'integer',
-        'INT_UDF2' => 'integer',
-        'INT_UDF3' => 'integer'
+        'attachment' => 'string',
+        'trip_id' => 'integer',
+        'invoice_id' => 'integer',
     ];
 
     /**
@@ -128,80 +65,108 @@ class DeliveryOrder extends Model
      * @var array
      */
     public static $rules = [
-        // 'dono' => 'required|string|max:255|unique:deliveryorders,dono',
-        'dono' => 'required|string|max:255',
+        'invoiceno' => 'nullable|string|max:255',
         'date' => 'required',
-        'driver_id' => 'required',
-        'lorry_id' => 'required',
-        'vendor_id' => 'required',
-        'source_id' => 'required',
-        'destinate_id' => 'required',
-        'item_id' => 'required',
-        'weight' => 'required|numeric',
-        'shipweight' => 'nullable|numeric',
-        // 'billingrate' => 'required|numeric',
-        // 'commissionrate' => 'required|numeric',
-        // 'fees' => 'required|numeric',
-        // 'tol' => 'required|numeric',
+        'customer_id' => 'required',
+        'paymentterm' => 'required',
         'status' => 'required',
-        'remark' => 'nullable|string',
-        'STR_UDF1' => 'nullable|string',
-        'STR_UDF2' => 'nullable|string',
-        'STR_UDF3' => 'nullable|string',
-        'INT_UDF1' => 'nullable|integer',
-        'INT_UDF2' => 'nullable|integer',
-        'INT_UDF3' => 'nullable|integer',
+        'remark' => 'nullable|string|max:255',
         'created_at' => 'nullable',
         'updated_at' => 'nullable',
-        'deleted_at' => 'nullable'
     ];
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     **/
-    public function destinate()
+    public function customer()
     {
-        return $this->belongsTo(\App\Models\Location::class, 'destinate_id');
+        return $this->belongsTo(\App\Models\Customer::class, 'customer_id', 'id');
     }
 
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     **/
-    public function item()
-    {
-        return $this->belongsTo(\App\Models\Item::class, 'item_id');
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     **/
-    public function source()
-    {
-        return $this->belongsTo(\App\Models\Location::class, 'source_id');
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     **/
     public function driver()
     {
-        return $this->belongsTo(\App\Models\Driver::class, 'driver_id');
+        return $this->belongsTo(\App\Models\Driver::class, 'driver_id', 'id');
+    }
+
+    public function kelindan()
+    {
+        return $this->belongsTo(\App\Models\Kelindan::class, 'kelindan_id', 'id');
+    }
+
+    public function agent()
+    {
+        return $this->belongsTo(\App\Models\Agent::class, 'agent_id', 'id');
+    }
+
+    public function supervisor()
+    {
+        return $this->belongsTo(\App\Models\Supervisor::class, 'supervisor_id', 'id');
+    }
+
+    public function deliveryorderdetail()
+    {
+        return $this->hasMany(\App\Models\DeliveryOrderDetail::class, 'deliveryorder_id');
+    }
+
+    public function invoice()
+    {
+        return $this->belongsTo(\App\Models\Invoice::class, 'invoice_id', 'id');
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     **/
-    public function lorry()
+     * Generate the next delivery order number for the current company and month.
+     * Format: DO{PREFIX}{YY}{MM}/{SEQUENCE} e.g. DOOC2608/00001
+     * Mirrors Invoice::generateInvoiceNo()'s DO-prefixed sequence, but runs against
+     * this table's own independent counter.
+     */
+    public static function generateDoNo(): string
     {
-        return $this->belongsTo(\App\Models\Lorry::class, 'lorry_id');
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+        $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
+        $doPrefix = 'DO' . $prefix;
+        $yy = date('y');
+        $mm = date('m');
+        $pattern = $doPrefix . $yy . $mm . '/%';
+
+        $lastDo = static::where('invoiceno', 'LIKE', $pattern)
+            ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/', invoiceno) + 1) AS UNSIGNED) DESC")
+            ->first();
+
+        $lastSeq = $lastDo
+            ? intval(substr($lastDo->invoiceno, strpos($lastDo->invoiceno, '/') + 1))
+            : 0;
+
+        $nextSeq = $lastSeq + 1;
+        $digits = max(5, strlen((string) $nextSeq));
+
+        return $doPrefix . $yy . $mm . '/' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     **/
-    public function vendor()
+     * Generate the next OFFLINE delivery order number for the current company and month.
+     * Format: DO{PREFIX}{YY}{MM}/A{SEQUENCE} e.g. DOOC2608/A00001
+     * Mirrors Invoice::generateOfflineInvoiceNo() — used when the driver app creates
+     * a DO while offline, kept on its own "A" sequence so it never collides with the
+     * server-assigned online DO numbers from generateDoNo().
+     */
+    public static function generateOfflineDoNo(): string
     {
-        return $this->belongsTo(\App\Models\Vendor::class, 'vendor_id');
+        $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
+        $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
+        $doPrefix = 'DO' . $prefix;
+        $yy = date('y');
+        $mm = date('m');
+        $pattern = $doPrefix . $yy . $mm . '/A%';
+
+        $lastDo = static::where('invoiceno', 'LIKE', $pattern)
+            ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/A', invoiceno) + 2) AS UNSIGNED) DESC")
+            ->first();
+
+        $lastSeq = $lastDo
+            ? intval(substr($lastDo->invoiceno, strpos($lastDo->invoiceno, '/A') + 2))
+            : 0;
+
+        $nextSeq = $lastSeq + 1;
+        $digits = max(5, strlen((string) $nextSeq));
+
+        return $doPrefix . $yy . $mm . '/A' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
     }
 
     public function getDateAttribute($value)

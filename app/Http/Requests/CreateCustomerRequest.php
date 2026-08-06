@@ -26,6 +26,11 @@ class CreateCustomerRequest extends FormRequest
         // Code is intentionally not unique — duplicate codes across customers are allowed.
         $rules['code'] = ['required', 'string', 'max:255'];
 
+        foreach (Customer::pairedRules() as $field => $extraRules) {
+            $existing = $rules[$field] ?? [];
+            $rules[$field] = array_merge(is_string($existing) ? explode('|', $existing) : $existing, $extraRules);
+        }
+
         if ($this->eInvoiceService->isEnabled()) {
             $rules = array_merge($rules, $this->eInvoiceService->requiredFields());
         }

@@ -45,6 +45,7 @@ class Company extends Model
 
     public $fillable = [
         'code',
+        'registration_no',
         'name',
         'ssm',
         'tin',
@@ -66,6 +67,7 @@ class Company extends Model
     protected $casts = [
         'id'       => 'integer',
         'code'     => 'string',
+        'registration_no' => 'string',
         'name'     => 'string',
         'ssm'      => 'string',
         'tin'      => 'string',
