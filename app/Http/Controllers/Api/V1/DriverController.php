@@ -1850,7 +1850,7 @@ class DriverController extends Controller
             $invoiceno = null;
             $id = null;
             if(!empty($extinvoice)){
-                if($extinvoice->invoiceno != $data['invoiceno'] && $data['invoiceno'] != null){
+                if(!empty($data['invoiceno']) && $extinvoice->invoiceno != $data['invoiceno']){
                     $invoiceno = $data['invoiceno'] . "(" . $extinvoice->invoiceno . ")";
                 }else{
                     $invoiceno = $extinvoice->invoiceno;
@@ -1859,7 +1859,7 @@ class DriverController extends Controller
                 Invoice::where('id',$data['invoice_id'])->delete();
                 InvoiceDetail::where('invoice_id',$data['invoice_id'])->delete();
             }else{
-                if($data['invoiceno'] != null){
+                if(!empty($data['invoiceno'])){
                     $invoiceno = $data['invoiceno'];
                 }else{
                     $invoiceno = Invoice::generateInvoiceNo($customer->is_do);
