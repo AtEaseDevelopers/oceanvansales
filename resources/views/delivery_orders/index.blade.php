@@ -183,6 +183,23 @@
             });
         }
 
+        // Read the selected DO's date (rendered as d-m-Y) and return it as yyyy-mm-dd
+        // for the <input type="date"> default value.
+        function firstSelectedDoDate(){
+            var firstId = window.checkboxid[0];
+            var iso = '';
+            try {
+                $('#dataTableBuilder').DataTable().rows().every(function(){
+                    var d = this.data();
+                    if(String(d.id) === String(firstId) && d.date){
+                        var p = d.date.split('-'); // [dd, mm, yyyy]
+                        if(p.length === 3){ iso = p[2] + '-' + p[1] + '-' + p[0]; }
+                    }
+                });
+            } catch(err) {}
+            return iso;
+        }
+
         $(document).on("click", "#combineconvert", function(e){
             var m = "";
             if(window.checkboxid.length == 0){
@@ -193,12 +210,22 @@
             }else{
                 m = "Confirm to combine " + window.checkboxid.length + " delivery orders into ONE invoice for ANEKA INTERTRADE MARKETING SDN BHD?"
             }
+            var defaultDate = firstSelectedDoDate();
             $.confirm({
                 title: 'Combine and Convert',
-                content: m,
+                content: '<div>' + m + '</div>' +
+                    '<div class="form-group mt-3">' +
+                        '<label for="combineDate">Invoice Date</label>' +
+                        '<input type="date" id="combineDate" class="form-control" value="' + defaultDate + '">' +
+                    '</div>',
                 buttons: {
                     Yes: function() {
-                        combineConvertDo(window.checkboxid);
+                        var chosen = this.$content.find('#combineDate').val();
+                        if(!chosen){
+                            noti('i','Info','Please select an invoice date');
+                            return false; // keep the dialog open
+                        }
+                        combineConvertDo(window.checkboxid, chosen);
                     },
                     No: function() {
                         return;
@@ -206,13 +233,14 @@
                 }
             });
         });
-        function combineConvertDo(ids){
+        function combineConvertDo(ids, date){
             ShowLoad();
             $.ajax({
                 url: "{{ url('/deliveryOrders/combine-convert') }}",
                 type:"POST",
                 data:{
                     ids: ids,
+                    date: date,
                     _token: "{{ csrf_token() }}"
                 },
                 success:function(response){

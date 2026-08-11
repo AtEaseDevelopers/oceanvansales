@@ -459,7 +459,11 @@ class DeliveryOrderController extends AppBaseController
             $first = $deliveryOrders->first();
 
             $invoice = new Invoice();
-            $invoice->date = date('Y-m-d H:i:s');
+            // Use the date chosen in the dialog; fall back to the first DO's own date —
+            // never the conversion (today's) date.
+            $chosenDate = $request->input('date');
+            $invoiceDate = !empty($chosenDate) ? date_create($chosenDate) : false;
+            $invoice->date = $invoiceDate ?: $first->getRawOriginal('date');
             // Converted invoices always get a normal invoice number — never the DO-prefixed sequence.
             $invoice->invoiceno = Invoice::generateInvoiceNo(false);
             $invoice->customer_id = $customer->id;

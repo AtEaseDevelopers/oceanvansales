@@ -85,22 +85,35 @@ class AutocountController extends Controller
         $data = $invoices->map(function (Invoice $invoice) {
             $customer = Customer::find($invoice->customer_id);
 
-            $details = InvoiceDetail::where('invoice_id', $invoice->id)->get()->map(function ($detail) {
-                $product = Product::find($detail->product_id);
+            $details = InvoiceDetail::with('deliveryorder.customer')
+                ->where('invoice_id', $invoice->id)->get()->map(function ($detail) {
+                    $product = Product::find($detail->product_id);
+                    $productName = $product->name ?? '';
 
-                // Push the product master alongside the line so the plugin can create the
-                // stock item in AutoCount (when missing) and post a real item line — this
-                // is what makes the item code appear on the AutoCount invoice detail.
-                return [
-                    'item_code'           => $product->code ?? null,
-                    'item_name'           => $product->name ?? null,
-                    'item_price'          => $product->price ?? null,
-                    'classification_code' => $product->classification_code ?? null,
-                    'description'         => $detail->remark ?: ($product->name ?? ''),
-                    'quantity'            => $detail->quantity,
-                    'unit_price'          => $detail->price,
-                ];
-            })->values();
+                    // Lines converted from a Delivery Order carry the source DO. Its number
+                    // becomes the AutoCount line's "Our D/O No.", and its (sub-)customer code
+                    // is appended to the product name so the synced description matches the
+                    // printed invoice exactly ("AIS HANCUR - SA12"). See invoices.print_converted.
+                    $sourceCustomerCode = optional(optional($detail->deliveryorder)->customer)->customer_code;
+                    $description = $sourceCustomerCode
+                        ? $productName . ' - ' . $sourceCustomerCode
+                        : ($detail->remark ?: $productName);
+
+                    // Push the product master alongside the line so the plugin can create the
+                    // stock item in AutoCount (when missing) and post a real item line — this
+                    // is what makes the item code appear on the AutoCount invoice detail.
+                    return [
+                        'item_code'           => $product->code ?? null,
+                        'item_name'           => $product->name ?? null,
+                        'item_price'          => $product->price ?? null,
+                        'classification_code' => $product->classification_code ?? null,
+                        'description'         => $description,
+                        // Source Delivery Order number -> AutoCount line "Our D/O No.".
+                        'do_no'               => optional($detail->deliveryorder)->invoiceno,
+                        'quantity'            => $detail->quantity,
+                        'unit_price'          => $detail->price,
+                    ];
+                })->values();
 
             return [
                 'id'          => $invoice->id,

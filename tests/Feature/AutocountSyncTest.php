@@ -39,15 +39,28 @@ class AutocountSyncTest extends TestCase
             $table->bigIncrements('id');
             $table->integer('invoice_id');
             $table->integer('product_id');
+            // Source Delivery Order a line was converted from (null for plain invoices).
+            $table->integer('deliveryorder_id')->nullable();
             $table->integer('quantity');
             $table->float('price', 10, 2);
             $table->string('remark')->nullable();
             $table->timestamps();
         });
 
+        // Delivery Orders a converted invoice's lines trace back to; the plugin maps
+        // a DO's invoiceno onto the AutoCount line's "Our D/O No." field.
+        Schema::create('deliveryorders', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('invoiceno')->nullable();
+            $table->integer('customer_id')->nullable();
+            $table->integer('invoice_id')->nullable();
+        });
+
         Schema::create('customers', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->string('code')->nullable();
+            // Sub-code appended to the product name on converted DO invoices ("Widget - SA12").
+            $table->string('customer_code')->nullable();
             $table->string('company')->nullable();
             $table->string('paymentterm')->nullable();
             $table->string('phone')->nullable();
@@ -77,6 +90,7 @@ class AutocountSyncTest extends TestCase
     protected function tearDown(): void
     {
         Schema::dropIfExists('invoice_details');
+        Schema::dropIfExists('deliveryorders');
         Schema::dropIfExists('invoices');
         Schema::dropIfExists('customers');
         Schema::dropIfExists('products');
@@ -177,6 +191,59 @@ class AutocountSyncTest extends TestCase
             ->assertJsonPath('0.details.0.item_name', 'Widget')
             ->assertJsonPath('0.details.0.item_price', 12.5)
             ->assertJsonPath('0.details.0.classification_code', '022');
+    }
+
+    /** @test */
+    public function queued_endpoint_maps_source_do_no_and_full_description_for_converted_lines()
+    {
+        // A line converted from a Delivery Order must sync the SAME description shown on
+        // the printed invoice ("{product} - {source DO customer_code}") and expose the
+        // source DO number so the plugin can write it to AutoCount's "Our D/O No." field.
+        $this->makeCompany(1, 'OC');
+        DB::table('customers')->insert(['id' => 1, 'code' => '3001-A02', 'company' => 'ANEKA INTERTRADE MARKETING SDN BHD', 'paymentterm' => '2']);
+        // Sub-customer the source DO belongs to; its customer_code is the "- SA12" suffix.
+        DB::table('customers')->insert(['id' => 2, 'code' => '3001-S12', 'customer_code' => 'SA12', 'company' => 'Sub Outlet']);
+        DB::table('products')->insert(['id' => 1, 'code' => 'H01', 'name' => 'AIS HANCUR', 'price' => 1.75]);
+
+        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'company_id' => 1, 'customer_id' => 1]);
+
+        $doId = DB::table('deliveryorders')->insertGetId([
+            'invoiceno' => 'DOOC2608/00001', 'customer_id' => 2, 'invoice_id' => $queued,
+        ]);
+
+        DB::table('invoice_details')->insert([
+            'invoice_id' => $queued, 'product_id' => 1, 'deliveryorder_id' => $doId,
+            'quantity' => 20, 'price' => 1.75, 'remark' => null,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/autocount/invoices/queued?book=OC')
+            ->assertStatus(200)
+            ->assertJsonPath('0.details.0.description', 'AIS HANCUR - SA12')
+            ->assertJsonPath('0.details.0.do_no', 'DOOC2608/00001');
+    }
+
+    /** @test */
+    public function queued_endpoint_keeps_plain_description_for_non_converted_lines()
+    {
+        // A plain (not converted) line has no source DO: description falls back to the
+        // remark (or product name) and do_no is null.
+        $this->makeCompany(1, 'OC');
+        DB::table('customers')->insert(['id' => 1, 'code' => '300-A001', 'company' => 'ABC Sdn Bhd', 'paymentterm' => '2']);
+        DB::table('products')->insert(['id' => 1, 'code' => 'P001', 'name' => 'Widget', 'price' => 12.50]);
+
+        $queued = $this->makeInvoice(['autocount_status' => Invoice::AUTOCOUNT_QUEUED, 'company_id' => 1, 'customer_id' => 1]);
+
+        DB::table('invoice_details')->insert([
+            'invoice_id' => $queued, 'product_id' => 1, 'deliveryorder_id' => null,
+            'quantity' => 3, 'price' => 10.50, 'remark' => 'Line remark',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->getJson('/api/autocount/invoices/queued?book=OC')
+            ->assertStatus(200)
+            ->assertJsonPath('0.details.0.description', 'Line remark')
+            ->assertJsonPath('0.details.0.do_no', null);
     }
 
     /** @test */
