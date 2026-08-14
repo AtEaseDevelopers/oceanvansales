@@ -196,11 +196,14 @@ Route::group(['middleware' => ['auth']], function() {
         Route::post('/deliveryOrders/{id}/adddetail', [App\Http\Controllers\DeliveryOrderController::class, 'adddetail'])->name('deliveryOrders.adddetail');
         Route::delete('/deliveryOrders/{id}/deletedetail', [App\Http\Controllers\DeliveryOrderController::class, 'deletedetail'])->name('deliveryOrders.deletedetail');
         Route::get('/deliveryOrders/customer/{id}', [App\Http\Controllers\DeliveryOrderController::class, 'getcustomer']);
+        // Must precede the resource route so the {deliveryOrder} show route doesn't swallow it.
+        Route::get('/deliveryOrders/merge-invoices', [App\Http\Controllers\DeliveryOrderController::class, 'mergeInvoices'])->name('deliveryOrders.merge-invoices');
         Route::resource('deliveryOrders', App\Http\Controllers\DeliveryOrderController::class);
         Route::post('/deliveryOrders/massdestroy', [App\Http\Controllers\DeliveryOrderController::class, 'massdestroy']);
         Route::post('/deliveryOrders/massupdatestatus', [App\Http\Controllers\DeliveryOrderController::class, 'massupdatestatus']);
         Route::post('/deliveryOrders/convert', [App\Http\Controllers\DeliveryOrderController::class, 'convert'])->name('deliveryOrders.convert');
         Route::post('/deliveryOrders/combine-convert', [App\Http\Controllers\DeliveryOrderController::class, 'combineConvert'])->name('deliveryOrders.combine-convert');
+        Route::post('/deliveryOrders/merge-convert', [App\Http\Controllers\DeliveryOrderController::class, 'mergeConvert'])->name('deliveryOrders.merge-convert');
         //Print Delivery Order
         Route::get('/print/deliveryOrders/getDoViewPDF/{id}/{function}', [App\Http\Controllers\DeliveryOrderController::class, 'getDoViewPDF'])->name('deliveryorder.print');
     });

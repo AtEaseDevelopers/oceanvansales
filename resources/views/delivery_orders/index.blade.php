@@ -16,6 +16,9 @@
                              <a class="pull-right" href="{{ route('deliveryOrders.create') }}"><i class="fa fa-plus-square fa-lg"></i></a>
                              <a class="pull-right text-danger pr-2" id="massdelete" href="#" alt="Mass delete"><i class="fa fa-trash fa-lg"></i></a>
                              <a class="pull-right text-success pr-2" id="massactive" href="#" alt="Mass active"><i class="fa fa-check fa-lg"></i></a>
+                             <button type="button" class="btn btn-warning btn-sm pull-right mr-2" id="mergeconvert" title="Merge the selected delivery orders into an existing invoice you pick; that invoice is reset to NOT synced to AutoCount">
+                                <i class="fa fa-compress"></i> Merge to Invoice
+                             </button>
                              <button type="button" class="btn btn-info btn-sm pull-right mr-2" id="combineconvert" title="Combine the selected delivery orders into one invoice for ANEKA INTERTRADE MARKETING SDN BHD">
                                 <i class="fa fa-object-group"></i> Combine and Convert
                              </button>
@@ -35,6 +38,23 @@
          </div>
     </div>
 @endsection
+
+@push('styles')
+    <style>
+        /* Invoice-picker list lives inline inside the modal (no floating dropdown), so it can
+           never be clipped. Wrap long invoice/customer text and highlight the chosen row. */
+        #mergeInvoiceList .list-group-item {
+            white-space: normal;
+            word-break: break-word;
+            cursor: pointer;
+        }
+        #mergeInvoiceList .list-group-item.active {
+            background-color: #20a8d8;
+            border-color: #20a8d8;
+            color: #fff;
+        }
+    </style>
+@endpush
 
 @push('scripts')
     <script>
@@ -251,6 +271,115 @@
                 error: function(error) {
                     HideLoad();
                     noti('e','Please contact your administrator', error.responseJSON?.message || 'Failed to combine delivery orders');
+                }
+            });
+        }
+
+        // Render invoice search results as an inline, clickable list inside the modal.
+        // No floating dropdown (select2) — it can't survive jquery-confirm's clipping panes —
+        // just a normal scrollable list that lives entirely within the dialog.
+        function renderMergeInvoiceResults($list, $hidden, results){
+            $list.empty();
+            $hidden.val('');
+            if(!results || !results.length){
+                $list.append($('<div class="list-group-item text-muted"></div>').text('No invoices found'));
+                return;
+            }
+            results.forEach(function(item){
+                $('<a href="#" class="list-group-item list-group-item-action"></a>')
+                    .attr('data-id', item.id)
+                    .text(item.text)
+                    .appendTo($list);
+            });
+        }
+
+        $(document).on("click", "#mergeconvert", function(e){
+            if(window.checkboxid.length == 0){
+                noti('i','Info','Please select at least one delivery order');
+                return;
+            }
+            var count = window.checkboxid.length;
+            var m = "Pick an existing invoice to merge " + count + " selected delivery order" + (count > 1 ? "s" : "") + " into. The invoice will be reset to NOT synced to AutoCount.";
+            $.confirm({
+                title: 'Merge to Invoice',
+                columnClass: 'medium',
+                content: '<div>' + m + '</div>' +
+                    '<div class="form-group mt-3">' +
+                        '<label for="mergeInvoiceSearch">Invoice</label>' +
+                        '<input type="text" id="mergeInvoiceSearch" class="form-control" placeholder="Search invoice number..." autocomplete="off">' +
+                        '<div id="mergeInvoiceList" class="list-group mt-2" style="max-height: 240px; overflow-y: auto;"></div>' +
+                        '<input type="hidden" id="mergeInvoiceId">' +
+                    '</div>',
+                onContentReady: function(){
+                    var self = this;
+                    var url = "{{ url('/deliveryOrders/merge-invoices') }}";
+                    var $search = self.$content.find('#mergeInvoiceSearch');
+                    var $list = self.$content.find('#mergeInvoiceList');
+                    var $hidden = self.$content.find('#mergeInvoiceId');
+                    var timer = null;
+
+                    function load(q){
+                        $list.html('<div class="list-group-item text-muted">Loading...</div>');
+                        $.ajax({
+                            url: url,
+                            dataType: 'json',
+                            data: { q: q },
+                            success: function(data){ renderMergeInvoiceResults($list, $hidden, data.results); },
+                            error: function(){ $list.html('<div class="list-group-item text-danger">Failed to load invoices</div>'); }
+                        });
+                    }
+
+                    // Pick a row.
+                    self.$content.on('click', '#mergeInvoiceList .list-group-item[data-id]', function(ev){
+                        ev.preventDefault();
+                        $list.find('.list-group-item').removeClass('active');
+                        $(this).addClass('active');
+                        $hidden.val($(this).attr('data-id'));
+                    });
+
+                    // Debounced search.
+                    $search.on('keyup', function(){
+                        var q = $(this).val();
+                        clearTimeout(timer);
+                        timer = setTimeout(function(){ load(q); }, 250);
+                    });
+
+                    load(''); // initial: most recent invoices
+                    setTimeout(function(){ $search.focus(); }, 0);
+                },
+                buttons: {
+                    Yes: function() {
+                        var invoiceId = this.$content.find('#mergeInvoiceId').val();
+                        if(!invoiceId){
+                            noti('i','Info','Please select an invoice');
+                            return false; // keep the dialog open
+                        }
+                        mergeConvertDo(window.checkboxid, invoiceId);
+                    },
+                    No: function() {
+                        return;
+                    }
+                }
+            });
+        });
+        function mergeConvertDo(ids, invoiceId){
+            ShowLoad();
+            $.ajax({
+                url: "{{ url('/deliveryOrders/merge-convert') }}",
+                type:"POST",
+                data:{
+                    ids: ids,
+                    invoice_id: invoiceId,
+                    _token: "{{ csrf_token() }}"
+                },
+                success:function(response){
+                    window.checkboxid = [];
+                    $('.buttons-reload').click();
+                    noti('s','Merged', response.message);
+                },
+                error: function(error) {
+                    HideLoad();
+                    noti('e','Please contact your administrator', error.responseJSON?.message || 'Failed to merge delivery orders');
                 }
             });
         }

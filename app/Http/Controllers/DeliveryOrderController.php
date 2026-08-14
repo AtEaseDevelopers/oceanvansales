@@ -507,4 +507,111 @@ class DeliveryOrderController extends AppBaseController
             return response()->json(['message' => 'Something went wrong. Please contact administrator.'], 500);
         }
     }
+
+    /**
+     * Merge the selected Delivery Orders' lines into an EXISTING invoice chosen by the user
+     * (see mergeInvoices() for the picker), then reset that invoice's AutoCount sync state to
+     * NOT SYNCED — its contents changed, so any previous push is stale and it must be
+     * re-synced before the desktop plugin can pick it up again.
+     */
+    public function mergeConvert(Request $request)
+    {
+        $ids = $request->input('ids', []);
+        $invoiceId = $request->input('invoice_id');
+
+        if (empty($ids)) {
+            return response()->json(['message' => 'Please select at least one delivery order.'], 422);
+        }
+
+        if (empty($invoiceId)) {
+            return response()->json(['message' => 'Please select an invoice to merge into.'], 422);
+        }
+
+        $invoice = Invoice::find($invoiceId);
+
+        if (empty($invoice)) {
+            return response()->json(['message' => 'Selected invoice not found.'], 422);
+        }
+
+        $deliveryOrders = DeliveryOrder::with('deliveryorderdetail')
+            ->whereIn('id', $ids)
+            ->whereNull('invoice_id')
+            ->get();
+
+        if ($deliveryOrders->isEmpty()) {
+            return response()->json(['message' => 'Selected delivery order(s) are already converted or not found.'], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($deliveryOrders as $deliveryOrder) {
+                foreach ($deliveryOrder->deliveryorderdetail as $line) {
+                    $detail = new InvoiceDetail();
+                    $detail->invoice_id = $invoice->id;
+                    $detail->product_id = $line->product_id;
+                    $detail->deliveryorder_id = $deliveryOrder->id;
+                    $detail->quantity = $line->quantity;
+                    $detail->price = $line->price;
+                    $detail->totalprice = $line->totalprice;
+                    $detail->remark = $line->remark;
+                    $detail->save();
+                }
+
+                $deliveryOrder->invoice_id = $invoice->id;
+                $deliveryOrder->save();
+            }
+
+            // Contents changed → any earlier AutoCount push is stale. Reset to NOT SYNCED and
+            // clear the previous sync metadata so it re-syncs cleanly next time it is queued.
+            $invoice->autocount_status = Invoice::AUTOCOUNT_NOT_SYNCED;
+            $invoice->autocount_docno = null;
+            $invoice->autocount_error = null;
+            $invoice->autocount_synced_at = null;
+            $invoice->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => $deliveryOrders->count() . ' delivery order(s) merged into invoice ' . $invoice->invoiceno . '.',
+                'count' => $deliveryOrders->count(),
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+
+            return response()->json(['message' => 'Something went wrong. Please contact administrator.'], 500);
+        }
+    }
+
+    /**
+     * Search existing invoices for the "Merge to Invoice" picker (select2 AJAX source).
+     * Voided invoices are excluded — you cannot merge into a cancelled document.
+     */
+    public function mergeInvoices(Request $request)
+    {
+        $search = trim($request->input('q', ''));
+
+        $invoices = Invoice::with('customer')
+            ->where('status', '!=', Invoice::STATUS_VOIDED)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where('invoiceno', 'like', '%' . $search . '%');
+            })
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get();
+
+        $results = $invoices->map(function ($invoice) {
+            $company = optional($invoice->customer)->company;
+            $date = $invoice->getRawOriginal('date');
+
+            return [
+                'id' => $invoice->id,
+                'text' => $invoice->invoiceno
+                    . ($company ? ' — ' . $company : '')
+                    . ($date ? ' (' . $date . ')' : ''),
+            ];
+        });
+
+        return response()->json(['results' => $results]);
+    }
 }
