@@ -20,6 +20,10 @@ class DeliveryOrder extends Model
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
 
+    // Status values (mirrors the "Completed/Cancelled" map in DeliveryOrderDataTable).
+    const STATUS_COMPLETED = 1;
+    const STATUS_CANCELLED = 2;
+
     public $fillable = [
         'invoiceno',
         'date',
