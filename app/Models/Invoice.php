@@ -29,6 +29,16 @@ class Invoice extends Model
     public const AUTOCOUNT_SYNCED     = 2;
     public const AUTOCOUNT_FAILED     = 3;
 
+    // Marker written to `remark` when several DOs are combined into one invoice. It is what
+    // identifies a "combined invoice" — the only kind that "Merge to Invoice" may target.
+    public const COMBINED_REMARK_PREFIX = 'Combined from';
+
+    /** Whether the given remark marks a combined invoice. */
+    public static function isCombinedRemark($remark): bool
+    {
+        return strncmp((string) $remark, self::COMBINED_REMARK_PREFIX, strlen(self::COMBINED_REMARK_PREFIX)) === 0;
+    }
+
 
     public $fillable = [
         'invoiceno',

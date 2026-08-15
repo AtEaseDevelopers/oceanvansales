@@ -282,7 +282,7 @@
             $list.empty();
             $hidden.val('');
             if(!results || !results.length){
-                $list.append($('<div class="list-group-item text-muted"></div>').text('No invoices found'));
+                $list.append($('<div class="list-group-item text-muted"></div>').text('No combined invoices found'));
                 return;
             }
             results.forEach(function(item){
@@ -299,14 +299,14 @@
                 return;
             }
             var count = window.checkboxid.length;
-            var m = "Pick an existing invoice to merge " + count + " selected delivery order" + (count > 1 ? "s" : "") + " into. The invoice will be reset to NOT synced to AutoCount.";
+            var m = "Pick a combined invoice to merge " + count + " selected delivery order" + (count > 1 ? "s" : "") + " into. Only combined invoices are listed; the invoice will be reset to NOT synced to AutoCount.";
             $.confirm({
                 title: 'Merge to Invoice',
                 columnClass: 'medium',
                 content: '<div>' + m + '</div>' +
                     '<div class="form-group mt-3">' +
-                        '<label for="mergeInvoiceSearch">Invoice</label>' +
-                        '<input type="text" id="mergeInvoiceSearch" class="form-control" placeholder="Search invoice number..." autocomplete="off">' +
+                        '<label for="mergeInvoiceSearch">Combined invoice</label>' +
+                        '<input type="text" id="mergeInvoiceSearch" class="form-control" placeholder="Search combined invoice number..." autocomplete="off">' +
                         '<div id="mergeInvoiceList" class="list-group mt-2" style="max-height: 240px; overflow-y: auto;"></div>' +
                         '<input type="hidden" id="mergeInvoiceId">' +
                     '</div>',

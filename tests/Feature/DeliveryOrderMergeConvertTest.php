@@ -29,6 +29,7 @@ class DeliveryOrderMergeConvertTest extends TestCase
             $table->integer('customer_id')->nullable();
             $table->integer('company_id')->nullable();
             $table->string('paymentterm')->nullable();
+            $table->text('remark')->nullable();
             $table->integer('status')->default(0);
             $table->tinyInteger('autocount_status')->default(0);
             $table->string('autocount_docno')->nullable();
@@ -93,6 +94,8 @@ class DeliveryOrderMergeConvertTest extends TestCase
             'invoiceno'        => 'OX2608/00001',
             'date'             => '2026-08-01',
             'customer_id'      => 1,
+            // "Merge to Invoice" only targets combined invoices, so the default target is one.
+            'remark'           => 'Combined from 2 delivery order(s)',
             'status'           => 1,
             'autocount_status' => Invoice::AUTOCOUNT_SYNCED,
             'autocount_docno'  => 'INV-999',
@@ -202,6 +205,22 @@ class DeliveryOrderMergeConvertTest extends TestCase
     }
 
     /** @test */
+    public function it_rejects_merging_into_a_non_combined_invoice()
+    {
+        // A plain (single-convert) invoice keeps the DO's own remark, never the "Combined from" marker.
+        $invoiceId = $this->makeInvoice(['remark' => 'walk-in']);
+        $do = $this->makeDo();
+
+        $this->withoutMiddleware()
+            ->postJson('/deliveryOrders/merge-convert', ['ids' => [$do], 'invoice_id' => $invoiceId])
+            ->assertStatus(422);
+
+        // Nothing is appended and the DO is left unconverted.
+        $this->assertEquals(0, DB::table('invoice_details')->where('invoice_id', $invoiceId)->count());
+        $this->assertNull(DB::table('deliveryorders')->find($do)->invoice_id);
+    }
+
+    /** @test */
     public function picker_lists_invoices_and_excludes_voided()
     {
         DB::table('customers')->insert(['id' => 1, 'company' => 'ABC Sdn Bhd']);
@@ -215,6 +234,22 @@ class DeliveryOrderMergeConvertTest extends TestCase
         $this->assertEquals($active, $response->json('results.0.id'));
         $this->assertStringContainsString('OX2608/00010', $response->json('results.0.text'));
         $this->assertStringContainsString('ABC Sdn Bhd', $response->json('results.0.text'));
+    }
+
+    /** @test */
+    public function picker_excludes_non_combined_invoices()
+    {
+        $combined = $this->makeInvoice(['invoiceno' => 'OX2608/00020']);
+        // Single-convert invoice — not a merge target.
+        $this->makeInvoice(['invoiceno' => 'OX2608/00021', 'remark' => 'some customer note']);
+        // No remark at all.
+        $this->makeInvoice(['invoiceno' => 'OX2608/00022', 'remark' => null]);
+
+        $response = $this->withoutMiddleware()
+            ->getJson('/deliveryOrders/merge-invoices');
+
+        $response->assertStatus(200)->assertJsonCount(1, 'results');
+        $this->assertEquals($combined, $response->json('results.0.id'));
     }
 
     /** @test */

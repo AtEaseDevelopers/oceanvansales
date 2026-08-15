@@ -473,7 +473,7 @@ class DeliveryOrderController extends AppBaseController
             $invoice->supervisor_id = $customer->supervisor_id;
             $invoice->paymentterm = $customer->paymentterm;
             $invoice->status = 1;
-            $invoice->remark = 'Combined from ' . $deliveryOrders->count() . ' delivery order(s)';
+            $invoice->remark = Invoice::COMBINED_REMARK_PREFIX . ' ' . $deliveryOrders->count() . ' delivery order(s)';
             $invoice->trip_id = $first->trip_id;
             $invoice->save();
 
@@ -533,6 +533,11 @@ class DeliveryOrderController extends AppBaseController
             return response()->json(['message' => 'Selected invoice not found.'], 422);
         }
 
+        // Only combined invoices (those created via "Combine to Invoice") may receive merged DOs.
+        if (!Invoice::isCombinedRemark($invoice->remark)) {
+            return response()->json(['message' => 'You can only merge into a combined invoice.'], 422);
+        }
+
         $deliveryOrders = DeliveryOrder::with('deliveryorderdetail')
             ->whereIn('id', $ids)
             ->whereNull('invoice_id')
@@ -585,6 +590,7 @@ class DeliveryOrderController extends AppBaseController
 
     /**
      * Search existing invoices for the "Merge to Invoice" picker (select2 AJAX source).
+     * Only combined invoices are offered — you may merge DOs into a combined invoice only.
      * Voided invoices are excluded — you cannot merge into a cancelled document.
      */
     public function mergeInvoices(Request $request)
@@ -593,6 +599,7 @@ class DeliveryOrderController extends AppBaseController
 
         $invoices = Invoice::with('customer')
             ->where('status', '!=', Invoice::STATUS_VOIDED)
+            ->where('remark', 'like', Invoice::COMBINED_REMARK_PREFIX . '%')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where('invoiceno', 'like', '%' . $search . '%');
             })
