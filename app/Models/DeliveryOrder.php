@@ -26,6 +26,7 @@ class DeliveryOrder extends Model
 
     public $fillable = [
         'invoiceno',
+        'uuid',
         'date',
         'customer_id',
         'driver_id',
@@ -49,6 +50,7 @@ class DeliveryOrder extends Model
     protected $casts = [
         'id' => 'integer',
         'invoiceno' => 'string',
+        'uuid' => 'string',
         'date' => 'date:d-m-Y',
         'customer_id' => 'integer',
         'driver_id' => 'integer',

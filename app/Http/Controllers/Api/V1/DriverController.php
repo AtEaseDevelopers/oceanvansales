@@ -1718,6 +1718,7 @@ class DriverController extends Controller
                 'remark' => 'present|nullable|string',
                 'invoice_id' => 'present|nullable|numeric',
                 'invoiceno' => 'present|nullable|string',
+                'uuid' => 'nullable|string',
                 'invoicedetail' => 'required|array',
                 'invoicedetail.*.product_id' => 'required',
                 'invoicedetail.*.quantity' => 'required',
@@ -1739,6 +1740,31 @@ class DriverController extends Controller
                     'data' => null
                 ], 400);
             }
+            // Idempotency guard: the mobile app can pass a client-generated uuid so a
+            // laggy double-tap that fires this endpoint twice doesn't create a duplicate
+            // invoice/DO — if a record with this uuid already exists, just return it.
+            // uuid is optional (present|nullable) since older app versions don't send it.
+            if (!empty($data['uuid'])) {
+                $existingInvoice = Invoice::where('uuid', $data['uuid'])->with('invoicedetail.product')->first();
+                if (!empty($existingInvoice)) {
+                    $existingInvoice->newcredit = $this->getCustomerCreditByDate($existingInvoice->customer_id, date('Y-m-d H:i:s'));
+                    return response()->json([
+                        'result' => true,
+                        'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                        'data' => $existingInvoice
+                    ], 200);
+                }
+
+                $existingDo = DeliveryOrder::where('uuid', $data['uuid'])->with('deliveryorderdetail.product')->first();
+                if (!empty($existingDo)) {
+                    return response()->json([
+                        'result' => true,
+                        'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                        'data' => $existingDo
+                    ], 200);
+                }
+            }
+
             // Customers flagged is_do get a Delivery Order instead of an Invoice —
             // it is later converted into a real Invoice via the web Delivery Order module.
             if ($customer->is_do) {
@@ -1752,6 +1778,7 @@ class DriverController extends Controller
                     $deliveryOrder = new DeliveryOrder();
                     $deliveryOrder->date = $data['date'] ?? date('Y-m-d H:i:s');
                     $deliveryOrder->invoiceno = $doNo;
+                    $deliveryOrder->uuid = $data['uuid'] ?? null;
                     $deliveryOrder->customer_id = $data['customer_id'];
                     $deliveryOrder->driver_id = $trip->driver_id;
                     $deliveryOrder->kelindan_id = $trip->kelindan_id;
@@ -1884,6 +1911,7 @@ class DriverController extends Controller
             }
             $invoice->date = $data['date'] ?? date('Y-m-d H:i:s');
             $invoice->invoiceno = $invoiceno;
+            $invoice->uuid = $data['uuid'] ?? null;
             $invoice->customer_id = $data['customer_id'];
             $invoice->driver_id = $trip->driver_id;
             $invoice->kelindan_id = $trip->kelindan_id;
@@ -2029,6 +2057,7 @@ class DriverController extends Controller
                     'type'                               => 'required|numeric|gt:0|lt:6',
                     'remark'                             => 'present|nullable|string',
                     'invoiceno'                          => 'present|nullable|string',
+                    'uuid'                               => 'nullable|string',
                     'invoicedetail'                      => 'required|array|min:1',
                     'invoicedetail.*.product_id'         => 'required|numeric',
                     'invoicedetail.*.quantity'           => 'required|numeric|min:1',
@@ -2057,6 +2086,41 @@ class DriverController extends Controller
                     continue;
                 }
 
+                // Idempotency guard: same purpose as in addinvoice() — if the app passed a
+                // uuid and a record with it already exists, return that instead of creating
+                // a duplicate. Optional field, so older app versions are unaffected.
+                if (!empty($invoiceInput['uuid'])) {
+                    $existingInvoice = Invoice::where('uuid', $invoiceInput['uuid'])->first();
+                    if (!empty($existingInvoice)) {
+                        $results[] = [
+                            'index'         => $index,
+                            'success'       => true,
+                            'invoiceno'     => $existingInvoice->invoiceno,
+                            'invoice_id'    => $existingInvoice->id,
+                            'date'          => $existingInvoice->date,
+                            'customer_id'   => $existingInvoice->customer_id,
+                            'customer_name' => $customer->company,
+                            'duplicate'     => true,
+                        ];
+                        continue;
+                    }
+
+                    $existingDo = DeliveryOrder::where('uuid', $invoiceInput['uuid'])->first();
+                    if (!empty($existingDo)) {
+                        $results[] = [
+                            'index'         => $index,
+                            'success'       => true,
+                            'invoiceno'     => $existingDo->invoiceno,
+                            'invoice_id'    => $existingDo->id,
+                            'date'          => $existingDo->date,
+                            'customer_id'   => $existingDo->customer_id,
+                            'customer_name' => $customer->company,
+                            'duplicate'     => true,
+                        ];
+                        continue;
+                    }
+                }
+
                 // Customers flagged is_do get a Delivery Order instead of an Invoice —
                 // it is later converted into a real Invoice via the web Delivery Order module.
                 if ($customer->is_do) {
@@ -2070,6 +2134,7 @@ class DriverController extends Controller
                     $deliveryOrder = new DeliveryOrder();
                     $deliveryOrder->date = $invoiceInput['date'] ?? date('Y-m-d H:i:s');
                     $deliveryOrder->invoiceno = $doNo;
+                    $deliveryOrder->uuid = $invoiceInput['uuid'] ?? null;
                     $deliveryOrder->customer_id = $customer->id;
                     $deliveryOrder->driver_id = $trip->driver_id;
                     $deliveryOrder->kelindan_id = $trip->kelindan_id;
@@ -2183,6 +2248,7 @@ class DriverController extends Controller
                 $invoice               = new Invoice();
                 $invoice->date         = $invoiceInput['date'] ?? date('Y-m-d H:i:s');
                 $invoice->invoiceno    = $invoiceno;
+                $invoice->uuid         = $invoiceInput['uuid'] ?? null;
                 $invoice->customer_id  = $customer->id;
                 $invoice->driver_id    = $trip->driver_id;
                 $invoice->kelindan_id  = $trip->kelindan_id;
