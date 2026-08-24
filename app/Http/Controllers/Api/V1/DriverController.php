@@ -964,6 +964,13 @@ class DriverController extends Controller
                             ->where('companies.group_id',explode(',',$t['customer']['group'])[0])
                             ->select('companies.*')
                             ->first() ?? null;
+                        if (!empty($t['customer']['is_do']) && !empty($t['invoice_id'])) {
+                            // is_do customers: invoice_id holds a DeliveryOrder id, not an
+                            // invoices.id — the eager-loaded invoice is an id-collision, swap in the DO
+                            $task[$c]['invoice'] = DeliveryOrder::where('id', $t['invoice_id'])
+                                ->with('deliveryorderdetail.product:id,code,name')
+                                ->first();
+                        }
                     }
                 }
             }else{
@@ -1074,6 +1081,13 @@ class DriverController extends Controller
                             ->first() ?? null;
                         $task[$c]['customer']['google'] = $t['customer']['address_location'];
                         $task[$c]['customer']['waze'] = $t['customer']['waze_location'];
+                        if (!empty($t['customer']['is_do']) && !empty($t['invoice_id'])) {
+                            // is_do customers: invoice_id holds a DeliveryOrder id, not an
+                            // invoices.id — the eager-loaded invoice is an id-collision, swap in the DO
+                            $task[$c]['invoice'] = DeliveryOrder::where('id', $t['invoice_id'])
+                                ->with('deliveryorderdetail.product:id,code,name')
+                                ->first();
+                        }
                     }
                 }
             }else{
@@ -1851,7 +1865,9 @@ class DriverController extends Controller
                         $inventorytransaction->save();
                     }
 
-                    Task::where('customer_id', $data['customer_id'])->where('driver_id',$driver->id)->update(['status' => 8]);
+                    // is_do customers: store the DO id in tasks.invoice_id so the mobile app
+                    // (which only knows "invoice_id") can pass it straight to invoicepdf
+                    Task::where('customer_id', $data['customer_id'])->where('driver_id',$driver->id)->update(['status' => 8, 'invoice_id' => $deliveryOrder->id]);
                     DB::commit();
 
                     $do = DeliveryOrder::where('id', $deliveryOrder->id)->with('deliveryorderdetail.product')->first();
@@ -2216,7 +2232,7 @@ class DriverController extends Controller
 
                     Task::where('customer_id', $customer->id)
                         ->where('driver_id', $driver->id)
-                        ->update(['status' => 8]);
+                        ->update(['status' => 8, 'invoice_id' => $deliveryOrder->id]);
 
                     DB::commit();
 
@@ -2428,6 +2444,32 @@ class DriverController extends Controller
             ->with('invoicedetail.product')
             ->with('invoicedetail.deliveryorder.customer')
             ->first();
+
+            $deliveryOrder = DeliveryOrder::where('id', $id)
+            ->with('customer')
+            ->with('driver')
+            ->with('deliveryorderdetail.product')
+            ->first();
+
+            // The mobile app sends a bare id for both invoices and DOs, and the two
+            // tables have overlapping auto-increment id ranges. When the id exists in
+            // both, prefer the record owned by the requesting driver; if both (or
+            // neither) are theirs, the newer record wins.
+            // ponytail: heuristic tiebreak — bump delivery_orders AUTO_INCREMENT above
+            // invoices' max so new ids never collide and this only matters for old rows.
+            if (!empty($invoice) && !empty($deliveryOrder)) {
+                $invoiceIsOwn = $invoice->driver_id == $driver->id;
+                $doIsOwn = $deliveryOrder->driver_id == $driver->id;
+                if ($doIsOwn && !$invoiceIsOwn) {
+                    $invoice = null;
+                } elseif ($invoiceIsOwn && !$doIsOwn) {
+                    $deliveryOrder = null;
+                } elseif ($deliveryOrder->created_at >= $invoice->created_at) {
+                    $invoice = null;
+                } else {
+                    $deliveryOrder = null;
+                }
+            }
 
             if (!empty($invoice)) {
                 $invoice->newcredit = $this->getCustomerCreditByDate($invoice->customer_id, (string) $invoice->updated_at);
