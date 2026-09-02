@@ -28,6 +28,19 @@ class Customer extends Model
         5 => 'Cheque',
     ];
 
+    /**
+     * Customer codes exempt from the "force Credit on invoice creation" rule —
+     * these customers keep whatever payment type the driver app actually sends.
+     * Every other customer's invoice/DO always gets paymentterm = Credit,
+     * regardless of what "type" the app passes. See DriverController::addinvoice()
+     * and ::bulkCreateInvoice().
+     */
+    const CODES_EXEMPT_FROM_FORCED_CREDIT = [
+        '3000-C09',
+        '300-C008',
+        '300-C009',
+    ];
+
 
     public $appends = [
         'GroupDescription',

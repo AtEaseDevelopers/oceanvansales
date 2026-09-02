@@ -1798,7 +1798,11 @@ class DriverController extends Controller
                     $deliveryOrder->kelindan_id = $trip->kelindan_id;
                     $deliveryOrder->agent_id = $customer->agent_id;
                     $deliveryOrder->supervisor_id = $customer->supervisor_id;
-                    $deliveryOrder->paymentterm = $data['type'];
+                    // Force Credit unless this customer's code is explicitly exempt —
+                    // the driver app has been observed sending the wrong payment type.
+                    $deliveryOrder->paymentterm = in_array($customer->code, Customer::CODES_EXEMPT_FROM_FORCED_CREDIT, true)
+                        ? $data['type']
+                        : 2;
                     $deliveryOrder->status = 1;
                     $deliveryOrder->chequeno = $data['cheque_no'] ?? null;
                     $deliveryOrder->remark = $data['remark'];
@@ -1933,7 +1937,11 @@ class DriverController extends Controller
             $invoice->kelindan_id = $trip->kelindan_id;
             $invoice->agent_id = $customer->agent_id;
             $invoice->supervisor_id = $customer->supervisor_id;
-            $invoice->paymentterm = $data['type'];
+            // Force Credit unless this customer's code is explicitly exempt —
+            // the driver app has been observed sending the wrong payment type.
+            $invoice->paymentterm = in_array($customer->code, Customer::CODES_EXEMPT_FROM_FORCED_CREDIT, true)
+                ? $data['type']
+                : 2;
             $invoice->status = 1;
             $invoice->chequeno = $data['cheque_no'] ?? null;
             $invoice->remark = $data['remark'];
@@ -1999,10 +2007,10 @@ class DriverController extends Controller
                 $inventorytransaction->date = date('Y-m-d H:i:s');
                 $inventorytransaction->save();
             }
-            if($data['type'] == 1 && $totalprice > 0){
+            if($invoice->paymentterm == 1 && $totalprice > 0){
                 $invoicepayment = New InvoicePayment();
                 $invoicepayment->invoice_id = $invoice->id;
-                $invoicepayment->type = $data['type'];
+                $invoicepayment->type = $invoice->paymentterm;
                 $invoicepayment->customer_id = $invoice->customer_id;
                 $invoicepayment->amount = $totalprice;
                 $invoicepayment->status = 1;
@@ -2156,7 +2164,11 @@ class DriverController extends Controller
                     $deliveryOrder->kelindan_id = $trip->kelindan_id;
                     $deliveryOrder->agent_id = $customer->agent_id;
                     $deliveryOrder->supervisor_id = $customer->supervisor_id;
-                    $deliveryOrder->paymentterm = $invoiceInput['type'];
+                    // Force Credit unless this customer's code is explicitly exempt —
+                    // the driver app has been observed sending the wrong payment type.
+                    $deliveryOrder->paymentterm = in_array($customer->code, Customer::CODES_EXEMPT_FROM_FORCED_CREDIT, true)
+                        ? $invoiceInput['type']
+                        : 2;
                     $deliveryOrder->status = 1;
                     $deliveryOrder->chequeno = $invoiceInput['cheque_no'] ?? null;
                     $deliveryOrder->remark = $invoiceInput['remark'] ?? null;
@@ -2270,7 +2282,11 @@ class DriverController extends Controller
                 $invoice->kelindan_id  = $trip->kelindan_id;
                 $invoice->agent_id     = $customer->agent_id;
                 $invoice->supervisor_id = $customer->supervisor_id;
-                $invoice->paymentterm  = $invoiceInput['type'];
+                // Force Credit unless this customer's code is explicitly exempt —
+                // the driver app has been observed sending the wrong payment type.
+                $invoice->paymentterm  = in_array($customer->code, Customer::CODES_EXEMPT_FROM_FORCED_CREDIT, true)
+                    ? $invoiceInput['type']
+                    : 2;
                 $invoice->status       = 1;
                 $invoice->chequeno     = $invoiceInput['cheque_no'] ?? null;
                 $invoice->remark       = $invoiceInput['remark'] ?? null;
@@ -2345,10 +2361,10 @@ class DriverController extends Controller
                 }
 
                 $paymentCreated = false;
-                if ($invoiceInput['type'] == 1 && $totalprice > 0) {
+                if ($invoice->paymentterm == 1 && $totalprice > 0) {
                     $invoicepayment             = new InvoicePayment();
                     $invoicepayment->invoice_id = $invoice->id;
-                    $invoicepayment->type       = $invoiceInput['type'];
+                    $invoicepayment->type       = $invoice->paymentterm;
                     $invoicepayment->customer_id = $invoice->customer_id;
                     $invoicepayment->amount     = $totalprice;
                     $invoicepayment->status     = 1;
