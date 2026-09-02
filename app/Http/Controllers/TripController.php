@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Models\Trip;
 use App\Models\Invoice;
+use App\Models\DeliveryOrder;
 use App\Models\Company;
 use App\Models\Customer;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -172,6 +173,17 @@ class TripController extends AppBaseController
                 ->get();
         }
 
+        // is_do customers get a Delivery Order instead of an Invoice — their stock
+        // deductions still need to count towards "Sales Used" in the stock movement
+        // table below, even though they're excluded from the payment breakdown.
+        $deliveryOrders = collect();
+        if ($startTrip) {
+            $deliveryOrders = DeliveryOrder::where('trip_id', $startTrip->id)
+                ->where('status', DeliveryOrder::STATUS_COMPLETED)
+                ->with(['deliveryorderdetail.product'])
+                ->get();
+        }
+
         // Payment term labels
         $paymentLabels = \App\Models\Customer::PAYMENT_TERMS;
 
@@ -220,6 +232,13 @@ class TripController extends AppBaseController
         $salesMap = [];
         foreach ($invoices as $invoice) {
             foreach ($invoice->invoicedetail as $detail) {
+                if ($detail->totalprice > 0 && $detail->product_id) {
+                    $salesMap[$detail->product_id] = ($salesMap[$detail->product_id] ?? 0) + $detail->quantity;
+                }
+            }
+        }
+        foreach ($deliveryOrders as $deliveryOrder) {
+            foreach ($deliveryOrder->deliveryorderdetail as $detail) {
                 if ($detail->totalprice > 0 && $detail->product_id) {
                     $salesMap[$detail->product_id] = ($salesMap[$detail->product_id] ?? 0) + $detail->quantity;
                 }
