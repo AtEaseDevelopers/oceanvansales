@@ -240,7 +240,7 @@ class TripController extends AppBaseController
             ->merge($adminInMap->keys())
             ->merge($adminOutMap->keys())
             ->merge($wastageMap->keys())
-            ->merge(array_keys($salesMap))
+            ->merge($salesMap->keys())
             ->unique()->values();
 
         $productNames = \App\Models\Product::whereIn('id', $allProductIds)->pluck('name', 'id');
