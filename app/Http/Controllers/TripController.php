@@ -228,32 +228,51 @@ class TripController extends AppBaseController
             ->selectRaw('product_id, SUM(ABS(quantity)) as total')->groupBy('product_id')
             ->pluck('total', 'product_id');
 
-        // Sales Used from the actual stock deductions (type 3), the same source the
-        // closing balance moved by — includes FOC lines and DO lines, unlike
-        // rebuilding from invoice/DO details, which skipped FOC and caused variance.
-        $salesMap = (clone $txBase)->where('type', 3)
-            ->selectRaw('product_id, SUM(ABS(quantity)) as total')->groupBy('product_id')
-            ->pluck('total', 'product_id');
+        // Sales Used, split by source. DO lines are always counted from
+        // deliveryorderdetail (that's where the stock was actually deducted).
+        // Invoice lines only count when deliveryorder_id is null — a converted DO's
+        // invoicedetail rows carry the source deliveryorder_id, and that quantity
+        // was already counted once via the DO above, so counting it again here
+        // would double it. No totalprice filter, so FOC lines are included too
+        // (they still deduct real stock).
+        $invoiceSalesMap = [];
+        foreach ($invoices as $invoice) {
+            foreach ($invoice->invoicedetail as $detail) {
+                if ($detail->product_id && empty($detail->deliveryorder_id)) {
+                    $invoiceSalesMap[$detail->product_id] = ($invoiceSalesMap[$detail->product_id] ?? 0) + $detail->quantity;
+                }
+            }
+        }
+        $doSalesMap = [];
+        foreach ($deliveryOrders as $deliveryOrder) {
+            foreach ($deliveryOrder->deliveryorderdetail as $detail) {
+                if ($detail->product_id) {
+                    $doSalesMap[$detail->product_id] = ($doSalesMap[$detail->product_id] ?? 0) + $detail->quantity;
+                }
+            }
+        }
 
         $allProductIds = collect($openingMap->keys())
             ->merge($closingMap->keys())
             ->merge($adminInMap->keys())
             ->merge($adminOutMap->keys())
             ->merge($wastageMap->keys())
-            ->merge($salesMap->keys())
+            ->merge(array_keys($invoiceSalesMap))
+            ->merge(array_keys($doSalesMap))
             ->unique()->values();
 
         $productNames = \App\Models\Product::whereIn('id', $allProductIds)->pluck('name', 'id');
 
-        $stockMovements = $allProductIds->map(function ($pid) use ($openingMap, $closingMap, $adminInMap, $adminOutMap, $wastageMap, $salesMap, $productNames) {
+        $stockMovements = $allProductIds->map(function ($pid) use ($openingMap, $closingMap, $adminInMap, $adminOutMap, $wastageMap, $invoiceSalesMap, $doSalesMap, $productNames) {
             return [
-                'product_name'  => $openingMap[$pid]['product_name'] ?? $closingMap[$pid]['product_name'] ?? ($productNames[$pid] ?? '-'),
-                'opening_stock' => (int) ($openingMap[$pid]['quantity'] ?? 0),
-                'admin_in'      => (int) ($adminInMap[$pid] ?? 0),
-                'admin_out'     => (int) ($adminOutMap[$pid] ?? 0),
-                'sales_used'    => (int) ($salesMap[$pid] ?? 0),
-                'wastage'       => (int) ($wastageMap[$pid] ?? 0),
-                'closing_stock' => (int) ($closingMap[$pid]['quantity'] ?? 0),
+                'product_name'   => $openingMap[$pid]['product_name'] ?? $closingMap[$pid]['product_name'] ?? ($productNames[$pid] ?? '-'),
+                'opening_stock'  => (int) ($openingMap[$pid]['quantity'] ?? 0),
+                'admin_in'       => (int) ($adminInMap[$pid] ?? 0),
+                'admin_out'      => (int) ($adminOutMap[$pid] ?? 0),
+                'sales_invoice'  => (int) ($invoiceSalesMap[$pid] ?? 0),
+                'sales_do'       => (int) ($doSalesMap[$pid] ?? 0),
+                'wastage'        => (int) ($wastageMap[$pid] ?? 0),
+                'closing_stock'  => (int) ($closingMap[$pid]['quantity'] ?? 0),
             ];
         })->sortBy('product_name')->values();
         // ──────────────────────────────────────────────────────────────────────
