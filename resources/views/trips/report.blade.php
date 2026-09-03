@@ -149,7 +149,7 @@
             <th style="width:12%">Opening Stock</th>
             <th style="width:10%">Admin In<br><span style="font-weight:normal;font-size:9px;">(Assigned)</span></th>
             <th style="width:10%">Admin Out<br><span style="font-weight:normal;font-size:9px;">(Removed)</span></th>
-            <th style="width:12%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(Invoiced)</span></th>
+            <th style="width:12%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(Incl. FOC &amp; DO)</span></th>
             <th style="width:10%">Wastage<br><span style="font-weight:normal;font-size:9px;">(Written Off)</span></th>
             <th style="width:12%">Closing Stock</th>
             <th style="width:6%">Variance</th>
@@ -225,6 +225,56 @@
         @endforelse
     </tbody>
 </table>
+
+{{-- Delivery Order Details --}}
+@if($deliveryOrders->count())
+<div class="section-label mt-10">Delivery Order Details</div>
+<table class="invoice-table">
+    <thead>
+        <tr>
+            <th style="width:12%">DO No</th>
+            <th style="width:18%">Customer</th>
+            <th style="width:12%">Payment</th>
+            <th style="width:30%">Item</th>
+            <th style="width:8%">Qty</th>
+            <th style="width:10%">Price (RM)</th>
+            <th style="width:10%">Amount (RM)</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($deliveryOrders as $deliveryOrder)
+            @php
+                $doTotal = $deliveryOrder->deliveryorderdetail->sum('totalprice');
+                $paymentLabel = $paymentLabels[$deliveryOrder->paymentterm] ?? $deliveryOrder->paymentterm;
+                $firstItem = true;
+            @endphp
+            @foreach($deliveryOrder->deliveryorderdetail as $detail)
+            <tr class="item-row">
+                @if($firstItem)
+                <td rowspan="{{ $deliveryOrder->deliveryorderdetail->count() }}">{{ $deliveryOrder->invoiceno }}</td>
+                <td rowspan="{{ $deliveryOrder->deliveryorderdetail->count() }}">{{ $deliveryOrder->customer?->company ?? '-' }}</td>
+                <td rowspan="{{ $deliveryOrder->deliveryorderdetail->count() }}">{{ $paymentLabel }}</td>
+                @php $firstItem = false; @endphp
+                @endif
+                <td>
+                    {{ $detail->product?->name ?? '-' }}
+                    @if($detail->remark === 'FOC')
+                        <span style="color:#e67e00;font-size:9px;">[FOC]</span>
+                    @endif
+                </td>
+                <td class="text-right">{{ $detail->quantity }}</td>
+                <td class="text-right">{{ number_format($detail->price, 2) }}</td>
+                <td class="text-right">{{ number_format($detail->totalprice, 2) }}</td>
+            </tr>
+            @endforeach
+            <tr class="inv-total">
+                <td colspan="6" style="text-align:right">DO Total:</td>
+                <td class="text-right">{{ number_format($doTotal, 2) }}</td>
+            </tr>
+        @endforeach
+    </tbody>
+</table>
+@endif
 
 <div class="footer">
     This report was generated automatically &mdash; {{ now()->format('d-m-Y H:i:s') }}

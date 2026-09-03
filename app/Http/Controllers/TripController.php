@@ -15,8 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Models\Trip;
 use App\Models\Invoice;
-use App\Models\DeliveryOrder;
 use App\Models\Company;
+use App\Models\DeliveryOrder;
 use App\Models\Customer;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -173,14 +173,13 @@ class TripController extends AppBaseController
                 ->get();
         }
 
-        // is_do customers get a Delivery Order instead of an Invoice — their stock
-        // deductions still need to count towards "Sales Used" in the stock movement
-        // table below, even though they're excluded from the payment breakdown.
+        // DOs (is_do customers) are listed in their own details section and counted
+        // in Sales Used, but stay out of the payment breakdown (no money collected yet)
         $deliveryOrders = collect();
         if ($startTrip) {
             $deliveryOrders = DeliveryOrder::where('trip_id', $startTrip->id)
                 ->where('status', DeliveryOrder::STATUS_COMPLETED)
-                ->with(['deliveryorderdetail.product'])
+                ->with(['customer', 'deliveryorderdetail.product'])
                 ->get();
         }
 
@@ -229,21 +228,12 @@ class TripController extends AppBaseController
             ->selectRaw('product_id, SUM(ABS(quantity)) as total')->groupBy('product_id')
             ->pluck('total', 'product_id');
 
-        $salesMap = [];
-        foreach ($invoices as $invoice) {
-            foreach ($invoice->invoicedetail as $detail) {
-                if ($detail->totalprice > 0 && $detail->product_id) {
-                    $salesMap[$detail->product_id] = ($salesMap[$detail->product_id] ?? 0) + $detail->quantity;
-                }
-            }
-        }
-        foreach ($deliveryOrders as $deliveryOrder) {
-            foreach ($deliveryOrder->deliveryorderdetail as $detail) {
-                if ($detail->totalprice > 0 && $detail->product_id) {
-                    $salesMap[$detail->product_id] = ($salesMap[$detail->product_id] ?? 0) + $detail->quantity;
-                }
-            }
-        }
+        // Sales Used from the actual stock deductions (type 3), the same source the
+        // closing balance moved by — includes FOC lines and DO lines, unlike
+        // rebuilding from invoice/DO details, which skipped FOC and caused variance.
+        $salesMap = (clone $txBase)->where('type', 3)
+            ->selectRaw('product_id, SUM(ABS(quantity)) as total')->groupBy('product_id')
+            ->pluck('total', 'product_id');
 
         $allProductIds = collect($openingMap->keys())
             ->merge($closingMap->keys())
@@ -269,7 +259,7 @@ class TripController extends AppBaseController
         // ──────────────────────────────────────────────────────────────────────
 
         $pdf = Pdf::loadView('trips.report', compact(
-            'startTrip', 'endTrip', 'invoices',
+            'startTrip', 'endTrip', 'invoices', 'deliveryOrders',
             'breakdown', 'grandTotal', 'paymentLabels',
             'startTime', 'endTime', 'duration', 'company',
             'stockMovements'
