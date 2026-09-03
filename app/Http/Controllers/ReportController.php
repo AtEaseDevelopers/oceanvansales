@@ -1011,6 +1011,11 @@ class ReportController extends AppBaseController
 
     public function customerPurchasePdf(Request $request)
     {
+        // See dailySalesPdf() — a long-tenured, high-volume customer over a wide date
+        // range can still be a lot of invoices/lines for dompdf to render.
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300);
+
         $request->validate([
             'date_from'   => 'required|date',
             'date_to'     => 'required|date|after_or_equal:date_from',
@@ -1028,7 +1033,11 @@ class ReportController extends AppBaseController
         $query = Invoice::whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
             ->where('status', 1)
             ->where('customer_id', $customerId)
-            ->with(['driver', 'invoicedetail.product']);
+            ->with([
+                'driver:id,name',
+                'invoicedetail:id,invoice_id,product_id,quantity,price,totalprice,remark',
+                'invoicedetail.product:id,name',
+            ]);
 
         // See dailySalesPdf() — filter by trip's lorry_id, not the volatile drivers.lorry_id.
         if (!empty($lorryIds)) {
@@ -1081,6 +1090,11 @@ class ReportController extends AppBaseController
 
     public function lorryMonthlySalesExcel(Request $request)
     {
+        // See dailySalesPdf() — a full month across every lorry builds a day x product
+        // matrix per lorry; cheap insurance against timing/memory out on a busy month.
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300);
+
         $request->validate([
             'date_from'    => 'required|date',
             'date_to'      => 'required|date|after_or_equal:date_from',
