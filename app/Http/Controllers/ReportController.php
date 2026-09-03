@@ -912,7 +912,7 @@ class ReportController extends AppBaseController
 
         $query = Invoice::whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
             ->where('status', 1)
-            ->with(['customer', 'driver', 'invoicedetail.product']);
+            ->with(['customer', 'driver', 'invoicedetail.product', 'trip.lorry']);
 
         // Filter by lorry via the trip the invoice was created on, not drivers.lorry_id
         // — that column only reflects whichever lorry a driver is CURRENTLY on and is
@@ -942,9 +942,31 @@ class ReportController extends AppBaseController
 
         $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
 
+        // When multiple lorries are selected, split Invoice Details into one section
+        // per lorry instead of one mixed list, so it's clear which invoices came from
+        // which lorry. Single/no lorry selection keeps the existing flat list.
+        $groupByLorry  = count($lorryIds) > 1;
+        $invoiceGroups = collect();
+        if ($groupByLorry) {
+            $lorryNames = Lorry::whereIn('id', $lorryIds)->pluck('lorryno', 'id');
+            $grouped    = $invoices->groupBy(fn($invoice) => $invoice->trip?->lorry_id ?? 0);
+            foreach ($lorryIds as $lorryId) {
+                if ($grouped->has($lorryId)) {
+                    $invoiceGroups->push([
+                        'label'    => $lorryNames[$lorryId] ?? ('Lorry #' . $lorryId),
+                        'invoices' => $grouped[$lorryId],
+                    ]);
+                }
+            }
+            if ($grouped->has(0)) {
+                $invoiceGroups->push(['label' => 'No Trip / Lorry', 'invoices' => $grouped[0]]);
+            }
+        }
+
         $pdf = Pdf::loadView('reports.daily_sales_pdf', compact(
             'invoices', 'breakdown', 'grandTotal', 'paymentLabels',
-            'dateFrom', 'dateTo', 'filterLorry', 'filterCustomer', 'filterPayment', 'company'
+            'dateFrom', 'dateTo', 'filterLorry', 'filterCustomer', 'filterPayment', 'company',
+            'groupByLorry', 'invoiceGroups'
         ))->setPaper('a4', 'landscape');
 
         return $pdf->stream('daily-sales-report-' . $dateFrom . '-to-' . $dateTo . '.pdf');

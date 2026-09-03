@@ -111,6 +111,11 @@ class Invoice extends Model
         return $this->belongsTo(\App\Models\Driver::class, 'driver_id', 'id');
     }
 
+    public function trip()
+    {
+        return $this->belongsTo(\App\Models\Trip::class, 'trip_id', 'id');
+    }
+
     public function kelindan()
     {
         return $this->belongsTo(\App\Models\Kelindan::class, 'kelindan_id', 'id');
