@@ -145,14 +145,11 @@
 <table class="stock-table">
     <thead>
         <tr>
-            <th class="col-product" style="width:24%">Product</th>
-            <th style="width:11%">Opening Stock</th>
-            <th style="width:9%">Admin In<br><span style="font-weight:normal;font-size:9px;">(Assigned)</span></th>
-            <th style="width:9%">Admin Out<br><span style="font-weight:normal;font-size:9px;">(Removed)</span></th>
-            <th style="width:11%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(Invoice)</span></th>
-            <th style="width:11%">Sales Used<br><span style="font-weight:normal;font-size:9px;">(DO)</span></th>
-            <th style="width:9%">Wastage<br><span style="font-weight:normal;font-size:9px;">(Written Off)</span></th>
-            <th style="width:16%">Closing Stock</th>
+            <th class="col-product" style="width:32%">Product</th>
+            <th style="width:16%">Opening Stock</th>
+            <th style="width:16%">Invoice</th>
+            <th style="width:16%">DO</th>
+            <th style="width:20%">Closing Stock</th>
         </tr>
     </thead>
     <tbody>
@@ -160,15 +157,12 @@
         <tr>
             <td class="col-product">{{ $row['product_name'] }}</td>
             <td>{{ $row['opening_stock'] }}</td>
-            <td class="{{ $row['admin_in'] > 0 ? 'pos' : '' }}">{{ $row['admin_in'] > 0 ? '+' : '' }}{{ $row['admin_in'] }}</td>
-            <td class="{{ $row['admin_out'] > 0 ? 'neg' : '' }}">{{ $row['admin_out'] > 0 ? '-' : '' }}{{ $row['admin_out'] }}</td>
             <td class="{{ $row['sales_invoice'] > 0 ? 'neg' : '' }}">{{ $row['sales_invoice'] > 0 ? '-' : '' }}{{ $row['sales_invoice'] }}</td>
             <td class="{{ $row['sales_do'] > 0 ? 'neg' : '' }}">{{ $row['sales_do'] > 0 ? '-' : '' }}{{ $row['sales_do'] }}</td>
-            <td class="{{ $row['wastage'] > 0 ? 'neg' : '' }}">{{ $row['wastage'] > 0 ? '-' : '' }}{{ $row['wastage'] }}</td>
             <td style="font-weight:bold;">{{ $row['closing_stock'] }}</td>
         </tr>
         @empty
-        <tr><td colspan="8" style="text-align:center;padding:10px;color:#999;">No stock snapshot available for this trip.</td></tr>
+        <tr><td colspan="5" style="text-align:center;padding:10px;color:#999;">No stock snapshot available for this trip.</td></tr>
         @endforelse
     </tbody>
 </table>
