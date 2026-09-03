@@ -34,6 +34,7 @@ use App\Models\Customer;
 use App\Models\Agent;
 use App\Models\Product;
 use App\Models\Company;
+use App\Models\Trip;
 use App\Exports\SellerInformationExport;
 use App\Exports\MonthlySaleReport;
 use App\Exports\DailySaleReportExport;
@@ -913,7 +914,13 @@ class ReportController extends AppBaseController
             ->where('status', 1)
             ->with(['customer', 'driver', 'invoicedetail.product']);
 
-        if (!empty($lorryIds)) $query->whereHas('driver', fn($q) => $q->whereIn('lorry_id', $lorryIds));
+        // Filter by lorry via the trip the invoice was created on, not drivers.lorry_id
+        // — that column only reflects whichever lorry a driver is CURRENTLY on and is
+        // reset to null once their trip ends, so it can't be used for historical reports.
+        if (!empty($lorryIds)) {
+            $tripIds = Trip::whereIn('lorry_id', $lorryIds)->pluck('id');
+            $query->whereIn('trip_id', $tripIds);
+        }
         if ($customerId)       $query->where('customer_id', $customerId);
         if ($paymentType)      $query->where('paymentterm', $paymentType);
 
@@ -975,7 +982,11 @@ class ReportController extends AppBaseController
             ->where('customer_id', $customerId)
             ->with(['driver', 'invoicedetail.product']);
 
-        if (!empty($lorryIds)) $query->whereHas('driver', fn($q) => $q->whereIn('lorry_id', $lorryIds));
+        // See dailySalesPdf() — filter by trip's lorry_id, not the volatile drivers.lorry_id.
+        if (!empty($lorryIds)) {
+            $tripIds = Trip::whereIn('lorry_id', $lorryIds)->pluck('id');
+            $query->whereIn('trip_id', $tripIds);
+        }
         if ($paymentType)      $query->where('paymentterm', $paymentType);
 
         $invoices = $query->orderBy('date')->get();
@@ -1044,12 +1055,16 @@ class ReportController extends AppBaseController
         $tables = collect();
 
         foreach ($lorries as $lorry) {
-            $driverIds = Driver::where('lorry_id', $lorry->id)->pluck('id');
+            // Join through the trip an invoice was created on, not drivers.lorry_id —
+            // that column only reflects whichever lorry a driver is CURRENTLY on and
+            // is reset to null once their trip ends, so it can't identify which lorry
+            // was used for a past invoice.
+            $tripIds = Trip::where('lorry_id', $lorry->id)->pluck('id');
 
-            $lines = $driverIds->isEmpty()
+            $lines = $tripIds->isEmpty()
                 ? collect()
                 : InvoiceDetail::join('invoices', 'invoices.id', '=', 'invoice_details.invoice_id')
-                    ->whereIn('invoices.driver_id', $driverIds)
+                    ->whereIn('invoices.trip_id', $tripIds)
                     ->where('invoices.status', 1)
                     ->whereBetween(DB::raw('DATE(invoices.date)'), [$dateFrom, $dateTo])
                     ->select(
