@@ -899,6 +899,12 @@ class ReportController extends AppBaseController
 
     public function dailySalesPdf(Request $request)
     {
+        // A whole month across many drivers can be thousands of invoices/lines, and
+        // dompdf (pure-PHP rendering) is memory/CPU heavy for large documents — bump
+        // the limits for just this request rather than raising them site-wide.
+        ini_set('memory_limit', '1024M');
+        set_time_limit(300);
+
         $request->validate([
             'date_from' => 'required|date',
             'date_to'   => 'required|date|after_or_equal:date_from',
@@ -912,7 +918,13 @@ class ReportController extends AppBaseController
 
         $query = Invoice::whereBetween(DB::raw('DATE(date)'), [$dateFrom, $dateTo])
             ->where('status', 1)
-            ->with(['customer', 'driver', 'invoicedetail.product', 'trip.lorry']);
+            ->with([
+                'customer:id,company',
+                'driver:id,name',
+                'invoicedetail:id,invoice_id,product_id,quantity,price,totalprice,remark',
+                'invoicedetail.product:id,name',
+                'trip:id,lorry_id',
+            ]);
 
         // Filter by lorry via the trip the invoice was created on, not drivers.lorry_id
         // — that column only reflects whichever lorry a driver is CURRENTLY on and is
