@@ -164,11 +164,18 @@ class TripController extends AppBaseController
             ->orderBy('id', 'desc')
             ->first();
 
-        // Get all invoices created during this trip
+        // Get all invoices created during this trip. Excludes invoices produced by
+        // "Convert"/"Combine and Convert" from a DO — those are just paperwork done
+        // later (possibly days after, in a different month) against the source DO's
+        // trip_id; the DO itself (below) already represents what happened on this
+        // trip, so the converted invoice would be an unrelated duplicate here.
         $invoices = collect();
         if ($startTrip) {
             $invoices = Invoice::where('trip_id', $startTrip->id)
                 ->where('status', 1)
+                ->whereDoesntHave('invoicedetail', function ($q) {
+                    $q->whereNotNull('deliveryorder_id');
+                })
                 ->with(['customer', 'invoicedetail.product'])
                 ->get();
         }
