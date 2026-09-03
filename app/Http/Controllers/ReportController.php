@@ -942,22 +942,36 @@ class ReportController extends AppBaseController
 
         $company = Company::find(app()->bound('current_company_id') ? app('current_company_id') : null);
 
-        // When multiple lorries are selected, split Invoice Details into one section
-        // per lorry instead of one mixed list, so it's clear which invoices came from
-        // which lorry. Single/no lorry selection keeps the existing flat list.
-        $groupByLorry  = count($lorryIds) > 1;
+        // Split Invoice Details into one section per lorry whenever more than one
+        // lorry is in play — either explicitly (2+ selected) or implicitly ("All
+        // lorries", i.e. none selected). Only a single specific lorry selected keeps
+        // the flat list, since grouping would just be one section anyway.
+        $groupByLorry  = count($lorryIds) !== 1;
         $invoiceGroups = collect();
         if ($groupByLorry) {
-            $lorryNames = Lorry::whereIn('id', $lorryIds)->pluck('lorryno', 'id');
-            $grouped    = $invoices->groupBy(fn($invoice) => $invoice->trip?->lorry_id ?? 0);
-            foreach ($lorryIds as $lorryId) {
-                if ($grouped->has($lorryId)) {
-                    $invoiceGroups->push([
-                        'label'    => $lorryNames[$lorryId] ?? ('Lorry #' . $lorryId),
-                        'invoices' => $grouped[$lorryId],
-                    ]);
+            $grouped = $invoices->groupBy(fn($invoice) => $invoice->trip?->lorry_id ?? 0);
+
+            if (!empty($lorryIds)) {
+                // Explicit multi-lorry filter: keep the order the user picked them in.
+                $lorryNames = Lorry::whereIn('id', $lorryIds)->pluck('lorryno', 'id');
+                foreach ($lorryIds as $lorryId) {
+                    if ($grouped->has($lorryId)) {
+                        $invoiceGroups->push([
+                            'label'    => $lorryNames[$lorryId] ?? ('Lorry #' . $lorryId),
+                            'invoices' => $grouped[$lorryId],
+                        ]);
+                    }
+                }
+            } else {
+                // No filter (all lorries): group by whichever lorries actually turn up
+                // in this date range, ordered by lorry number.
+                $presentLorryIds = $grouped->keys()->filter()->values();
+                $lorryNames      = Lorry::whereIn('id', $presentLorryIds)->orderBy('lorryno')->pluck('lorryno', 'id');
+                foreach ($lorryNames as $lorryId => $lorryName) {
+                    $invoiceGroups->push(['label' => $lorryName, 'invoices' => $grouped[$lorryId]]);
                 }
             }
+
             if ($grouped->has(0)) {
                 $invoiceGroups->push(['label' => 'No Trip / Lorry', 'invoices' => $grouped[0]]);
             }

@@ -98,8 +98,10 @@
 {{-- Invoice Details --}}
 @if($groupByLorry)
     @foreach($invoiceGroups as $group)
-        <div class="section-label mt-10">Invoice Details &mdash; Lorry: {{ $group['label'] }}</div>
-        @include('reports._daily_sales_invoice_table', ['invoices' => $group['invoices'], 'invoiceColgroup' => $invoiceColgroup, 'paymentLabels' => $paymentLabels])
+        <div @if(!$loop->first) style="page-break-before: always;" @endif>
+            <div class="section-label mt-10">Invoice Details &mdash; Lorry: {{ $group['label'] }}</div>
+            @include('reports._daily_sales_invoice_table', ['invoices' => $group['invoices'], 'invoiceColgroup' => $invoiceColgroup, 'paymentLabels' => $paymentLabels])
+        </div>
     @endforeach
 @else
     <div class="section-label mt-10">Invoice Details</div>
