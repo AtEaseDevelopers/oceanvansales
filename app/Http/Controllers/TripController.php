@@ -282,6 +282,18 @@ class TripController extends AppBaseController
                 'closing_stock'  => (int) ($closingMap[$pid]['quantity'] ?? 0),
             ];
         })->sortBy('product_name')->values();
+
+        // Drop rows where every column is 0 — nothing happened for that product on
+        // this trip, so it's noise rather than useful information.
+        $stockMovements = $stockMovements->reject(function ($row) {
+            return $row['opening_stock'] === 0
+                && $row['admin_in'] === 0
+                && $row['admin_out'] === 0
+                && $row['sales_invoice'] === 0
+                && $row['sales_do'] === 0
+                && $row['wastage'] === 0
+                && $row['closing_stock'] === 0;
+        })->values();
         // ──────────────────────────────────────────────────────────────────────
 
         $pdf = Pdf::loadView('trips.report', compact(
