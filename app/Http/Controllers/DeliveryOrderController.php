@@ -382,8 +382,10 @@ class DeliveryOrderController extends AppBaseController
                 $invoice = new Invoice();
                 $invoice->date = $deliveryOrder->getRawOriginal('date');
                 // Converted invoices always get a normal invoice number — never the DO-prefixed
-                // sequence — regardless of the source customer's is_do flag.
-                $invoice->invoiceno = Invoice::generateInvoiceNo(false);
+                // sequence — regardless of the source customer's is_do flag. Numbered against
+                // the DO's own month, not today's, so an August DO stays an OC2608 invoice
+                // even when converted in September.
+                $invoice->invoiceno = Invoice::generateInvoiceNo(false, $invoice->date);
                 $invoice->customer_id = $deliveryOrder->customer_id;
                 $invoice->driver_id = $deliveryOrder->driver_id;
                 $invoice->kelindan_id = $deliveryOrder->kelindan_id;
@@ -464,8 +466,9 @@ class DeliveryOrderController extends AppBaseController
             $chosenDate = $request->input('date');
             $invoiceDate = !empty($chosenDate) ? date_create($chosenDate) : false;
             $invoice->date = $invoiceDate ?: $first->getRawOriginal('date');
-            // Converted invoices always get a normal invoice number — never the DO-prefixed sequence.
-            $invoice->invoiceno = Invoice::generateInvoiceNo(false);
+            // Converted invoices always get a normal invoice number — never the DO-prefixed
+            // sequence. Numbered against the chosen/DO month, not today's — see convert().
+            $invoice->invoiceno = Invoice::generateInvoiceNo(false, $invoice->date);
             $invoice->customer_id = $customer->id;
             $invoice->driver_id = $first->driver_id;
             $invoice->kelindan_id = $first->kelindan_id;

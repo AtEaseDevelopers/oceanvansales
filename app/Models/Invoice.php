@@ -166,13 +166,17 @@ class Invoice extends Model
      * independent sequence counter, separate from regular invoices — the lookup
      * pattern includes the DO prefix so it only matches prior invoices of the same kind.
      */
-    public static function generateInvoiceNo(bool $isDo = false): string
+    public static function generateInvoiceNo(bool $isDo = false, $forDate = null): string
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
         $invoicePrefix = $isDo ? 'DO' . $prefix : $prefix;
-        $yy = date('y');
-        $mm = date('m');
+        // $forDate lets DO conversions number the invoice against the DO's own month
+        // (e.g. an August DO converted in September should still get an OC2608 number)
+        // instead of always using today's month.
+        $date = $forDate ? \Illuminate\Support\Carbon::parse($forDate) : now();
+        $yy = $date->format('y');
+        $mm = $date->format('m');
         $pattern = $invoicePrefix . $yy . $mm . '/%';
 
         $lastInvoice = static::where('invoiceno', 'LIKE', $pattern)
