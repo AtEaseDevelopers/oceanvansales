@@ -1912,18 +1912,47 @@ class DriverController extends Controller
                     $invoiceno = Invoice::generateInvoiceNo($customer->is_do);
                 }
             }
-            // Reject duplicate invoiceno within same company (BelongsToCompany scope applies automatically)
+            // Duplicate invoiceno within same company (BelongsToCompany scope applies automatically)
+            $renumberedFrom = null;
             $duplicateQuery = Invoice::where('invoiceno', $invoiceno);
             if ($id !== null) {
                 $duplicateQuery->where('id', '!=', $id);
             }
-            if ($duplicateQuery->exists()) {
-                DB::rollback();
-                return response()->json([
-                    'result' => false,
-                    'message' => __LINE__.$this->message_separator.'api.message.invoice_no_already_exists',
-                    'data' => null,
-                ], 400);
+            $duplicate = $duplicateQuery->first();
+            if ($duplicate) {
+                if ($id !== null) {
+                    // Replacing a status-0 invoice and its number is taken by another one:
+                    // that's inconsistent data, so keep rejecting rather than guess.
+                    DB::rollback();
+                    return response()->json([
+                        'result' => false,
+                        'message' => __LINE__.$this->message_separator.'api.message.invoice_no_already_exists',
+                        'data' => null,
+                    ], 400);
+                }
+
+                $requestTotal = round(collect($data['invoicedetail'])->sum(fn ($line) => $line['quantity'] * $line['price']), 2);
+                $savedTotal   = round($duplicate->invoicedetail()->sum('totalprice'), 2);
+                if ($duplicate->customer_id == $data['customer_id']
+                    && $duplicate->driver_id == $trip->driver_id
+                    && $requestTotal == $savedTotal) {
+                    // Same driver, customer and amount re-sending a number we already saved
+                    // (older app versions send no uuid) — it's a retry, hand back the saved one.
+                    DB::rollback();
+                    $saved = Invoice::where('id', $duplicate->id)->with('invoicedetail.product')->first();
+                    $saved->newcredit = $this->getCustomerCreditByDate($saved->customer_id, date('Y-m-d H:i:s'));
+                    return response()->json([
+                        'result' => true,
+                        'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                        'data' => $saved
+                    ], 200);
+                }
+
+                // A different invoice already holds this number — offline numbers are issued
+                // by each phone and aren't reserved server-side, so two devices can clash.
+                // Give this one the next free number instead of losing it (same as bulk-create).
+                $renumberedFrom = $invoiceno;
+                $invoiceno = Invoice::generateInvoiceNo($customer->is_do);
             }
             $invoice = new Invoice();
             if($id != null){
@@ -2025,6 +2054,9 @@ class DriverController extends Controller
             
              
             $iv->newcredit = $this->getCustomerCreditByDate($iv->customer_id, date('Y-m-d H:i:s'));
+            if ($renumberedFrom !== null) {
+                $iv->renumbered_from = $renumberedFrom;
+            }
 
             return response()->json([
                 'result' => true,
