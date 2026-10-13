@@ -1696,6 +1696,32 @@ class DriverController extends Controller
         }
     }
 
+    /**
+     * Find an already-saved sale (Invoice or DeliveryOrder) for the same driver and
+     * customer on the same calendar day whose line items (product, qty, price) are
+     * identical to $lines. Used as a duplicate guard for mobile resends that carry a
+     * different uuid and invoiceno than the original request.
+     */
+    private function findSameDaySale(string $model, $customerId, $driverId, $date, array $lines)
+    {
+        $relation = $model === Invoice::class ? 'invoicedetail' : 'deliveryorderdetail';
+
+        $lineKey = fn ($productId, $quantity, $price) => $productId . '|' . (float) $quantity . '|' . (float) $price;
+        $wanted = collect($lines)
+            ->map(fn ($l) => $lineKey($l['product_id'], $l['quantity'], $l['price']))
+            ->sort()->values()->all();
+
+        return $model::where('customer_id', $customerId)
+            ->where('driver_id', $driverId)
+            ->where('status', 1)
+            ->whereDate('date', date('Y-m-d', strtotime($date)))
+            ->with($relation . '.product')
+            ->get()
+            ->first(fn ($doc) => $doc->{$relation}
+                ->map(fn ($d) => $lineKey($d->product_id, $d->quantity, $d->price))
+                ->sort()->values()->all() === $wanted);
+    }
+
     public function addinvoice(Request $request){
         try{
             $data = $request->all();
@@ -1777,6 +1803,28 @@ class DriverController extends Controller
                         'data' => $existingDo
                     ], 200);
                 }
+            }
+
+            // Content duplicate guard: the app can resend the same sale with a NEW uuid
+            // and its own offline number (e.g. /invoice reply lost, sale re-queued
+            // offline), so the uuid and invoiceno guards never match. Same driver +
+            // customer + same day + identical lines = the same sale, return the saved copy.
+            // ponytail: swallows a genuine identical repeat order on the same day; narrow
+            // to a time window if that ever happens for real.
+            $sameDaySale = $this->findSameDaySale(
+                $customer->is_do ? DeliveryOrder::class : Invoice::class,
+                $customer->id, $trip->driver_id,
+                $data['date'] ?? date('Y-m-d H:i:s'), $data['invoicedetail']
+            );
+            if (!empty($sameDaySale)) {
+                if (!$customer->is_do) {
+                    $sameDaySale->newcredit = $this->getCustomerCreditByDate($sameDaySale->customer_id, date('Y-m-d H:i:s'));
+                }
+                return response()->json([
+                    'result' => true,
+                    'message' => __LINE__.$this->message_separator.'api.message.invoice_add_successfully',
+                    'data' => $sameDaySale
+                ], 200);
             }
 
             // Customers flagged is_do get a Delivery Order instead of an Invoice —
@@ -2175,6 +2223,28 @@ class DriverController extends Controller
                         ];
                         continue;
                     }
+                }
+
+                // Content duplicate guard — same rationale as in addinvoice(): a resent
+                // sale can carry a new uuid and its own offline number, so only matching
+                // on driver + customer + day + identical lines catches it.
+                $sameDaySale = $this->findSameDaySale(
+                    $customer->is_do ? DeliveryOrder::class : Invoice::class,
+                    $customer->id, $trip->driver_id,
+                    $invoiceInput['date'] ?? date('Y-m-d H:i:s'), $invoiceInput['invoicedetail']
+                );
+                if (!empty($sameDaySale)) {
+                    $results[] = [
+                        'index'         => $index,
+                        'success'       => true,
+                        'invoiceno'     => $sameDaySale->invoiceno,
+                        'invoice_id'    => $sameDaySale->id,
+                        'date'          => $sameDaySale->date,
+                        'customer_id'   => $sameDaySale->customer_id,
+                        'customer_name' => $customer->company,
+                        'duplicate'     => true,
+                    ];
+                    continue;
                 }
 
                 // Customers flagged is_do get a Delivery Order instead of an Invoice —
