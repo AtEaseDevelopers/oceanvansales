@@ -195,34 +195,32 @@ class Invoice extends Model
 
     /**
      * Generate the next OFFLINE invoice number for the current company and month.
-     * Format: {PREFIX}{YY}{MM}/A{SEQUENCE} e.g. OC2608/A00081
-     * Used by the driver app when it creates an invoice while offline, so it never
-     * collides with the server-assigned online sequence from generateInvoiceNo() —
-     * the "A" marker keeps the two sequences independent (and the numeric-cast used
-     * to find the last online sequence naturally ignores "A..." rows since they
-     * cast to 0, so offline numbers never interfere with online numbering either).
+     * Format: {PREFIX}{YY}{MM}/{SERIES}{SEQUENCE} e.g. OC2610/B00001
+     * Used by the driver app when it creates an invoice while offline. Each driver has
+     * their own $series letter(s) (drivers.offline_series), so two phones can't print the
+     * same number; "A" is the old shared series. The letter marker also keeps offline
+     * numbers out of generateInvoiceNo(): its numeric cast of the part after "/" turns
+     * any letter-led sequence into 0.
      */
-    public static function generateOfflineInvoiceNo(bool $isDo = false): string
+    public static function generateOfflineInvoiceNo(bool $isDo = false, string $series = Driver::LEGACY_OFFLINE_SERIES): string
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
         $invoicePrefix = $isDo ? 'DO' . $prefix : $prefix;
-        $yy = date('y');
-        $mm = date('m');
-        $pattern = $invoicePrefix . $yy . $mm . '/A%';
+        $base = $invoicePrefix . date('y') . date('m') . '/' . $series;
 
-        $lastInvoice = static::where('invoiceno', 'LIKE', $pattern)
-            ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/A', invoiceno) + 2) AS UNSIGNED) DESC")
+        // REGEXP so series "B" doesn't also match another driver's "BA..." numbers.
+        $lastInvoice = static::where('invoiceno', 'LIKE', $base . '%')
+            ->whereRaw('invoiceno REGEXP ?', ['^' . $base . '[0-9]+$'])
+            ->orderByRaw('CAST(SUBSTRING(invoiceno, ?) AS UNSIGNED) DESC', [strlen($base) + 1])
             ->first();
 
-        $lastSeq = $lastInvoice
-            ? intval(substr($lastInvoice->invoiceno, strpos($lastInvoice->invoiceno, '/A') + 2))
-            : 0;
+        $lastSeq = $lastInvoice ? intval(substr($lastInvoice->invoiceno, strlen($base))) : 0;
 
         $nextSeq = $lastSeq + 1;
         $digits = max(5, strlen((string) $nextSeq));
 
-        return $invoicePrefix . $yy . $mm . '/A' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
+        return $base . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
     }
 
     public function getDateAttribute($value)

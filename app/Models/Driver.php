@@ -19,6 +19,10 @@ class Driver extends Model
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
 
+    // The old offline invoice series every phone shared, so two drivers could print
+    // the same number. Each driver now gets their own series; "A" stays reserved.
+    const LEGACY_OFFLINE_SERIES = 'A';
+
 
     protected $dates = ['deleted_at'];
 
@@ -40,6 +44,7 @@ class Driver extends Model
         'remark',
         'session',
         'invoice_runningnumber',
+        'offline_series',
         'trip_id',
         'lorry_id',
     ];
@@ -71,6 +76,7 @@ class Driver extends Model
         'session' => 'string',
         'trip_id' => 'integer',
         'lorry_id' => 'integer',
+        'offline_series' => 'string',
     ];
 
     /**
@@ -100,6 +106,46 @@ class Driver extends Model
     public function lorry()
     {
         return $this->belongsTo(\App\Models\Lorry::class, 'lorry_id', 'id');
+    }
+
+    /**
+     * Offline series codes in the order they are handed out: B..Z, then BA..ZZ.
+     */
+    public static function offlineSeriesCodes(): array
+    {
+        $letters = array_slice(range('A', 'Z'), 1);
+        $codes = $letters;
+        foreach ($letters as $first) {
+            foreach (range('A', 'Z') as $second) {
+                $codes[] = $first . $second;
+            }
+        }
+        return $codes;
+    }
+
+    public static function offlineSeriesMessages(): array
+    {
+        return [
+            'offline_series.regex'  => 'Offline invoice series must be 1 to 3 letters (A-Z).',
+            'offline_series.not_in' => 'Offline invoice series "' . self::LEGACY_OFFLINE_SERIES . '" is reserved for the old shared series, please use another letter.',
+            'offline_series.unique' => 'This offline invoice series is already used by another driver.',
+        ];
+    }
+
+    public static function nextFreeOfflineSeries($companyId): ?string
+    {
+        $used = static::withoutGlobalScope('company')
+            ->where('company_id', $companyId)
+            ->whereNotNull('offline_series')
+            ->pluck('offline_series')
+            ->all();
+
+        foreach (static::offlineSeriesCodes() as $code) {
+            if (!in_array($code, $used, true)) {
+                return $code;
+            }
+        }
+        return null;
     }
 
     public function getFirstVaccineAttribute($value)

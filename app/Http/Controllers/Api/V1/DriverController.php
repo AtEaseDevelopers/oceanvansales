@@ -1625,14 +1625,17 @@ class DriverController extends Controller
                 ], 401);
             }
 
+            // Each driver draws offline numbers from their own series, so two phones
+            // working offline at the same time can't print the same number.
+            $series = $driver->offline_series ?: Driver::LEGACY_OFFLINE_SERIES;
             $data = [
                 'invoice' => [
                     'online' => Invoice::generateInvoiceNo(false),
-                    'offline' => Invoice::generateOfflineInvoiceNo(false),
+                    'offline' => Invoice::generateOfflineInvoiceNo(false, $series),
                 ],
                 'delivery_order' => [
                     'online' => DeliveryOrder::generateDoNo(),
-                    'offline' => DeliveryOrder::generateOfflineDoNo(),
+                    'offline' => DeliveryOrder::generateOfflineDoNo($series),
                 ],
             ];
 

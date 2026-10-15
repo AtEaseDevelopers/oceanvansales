@@ -28,6 +28,12 @@
     <p>{{ $driver->phone }}</p>
 </div>
 
+<!-- Offline Series Field -->
+<div class="form-group">
+    {!! Form::label('offline_series', __('drivers.offline_series')) !!}:
+    <p>{{ $driver->offline_series ?: '-' }}</p>
+</div>
+
 <!-- CommissionRate Field -->
 <!-- <div class="form-group">
     {!! Form::label('phone', 'Commission Rate:') !!}

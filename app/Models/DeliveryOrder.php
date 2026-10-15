@@ -147,32 +147,29 @@ class DeliveryOrder extends Model
 
     /**
      * Generate the next OFFLINE delivery order number for the current company and month.
-     * Format: DO{PREFIX}{YY}{MM}/A{SEQUENCE} e.g. DOOC2608/A00001
-     * Mirrors Invoice::generateOfflineInvoiceNo() — used when the driver app creates
-     * a DO while offline, kept on its own "A" sequence so it never collides with the
-     * server-assigned online DO numbers from generateDoNo().
+     * Format: DO{PREFIX}{YY}{MM}/{SERIES}{SEQUENCE} e.g. DOOC2610/B00001
+     * Mirrors Invoice::generateOfflineInvoiceNo(): $series is the driver's own
+     * offline_series ("A" is the old shared series), and the letter marker keeps it
+     * apart from the online DO numbers from generateDoNo().
      */
-    public static function generateOfflineDoNo(): string
+    public static function generateOfflineDoNo(string $series = Driver::LEGACY_OFFLINE_SERIES): string
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
-        $doPrefix = 'DO' . $prefix;
-        $yy = date('y');
-        $mm = date('m');
-        $pattern = $doPrefix . $yy . $mm . '/A%';
+        $base = 'DO' . $prefix . date('y') . date('m') . '/' . $series;
 
-        $lastDo = static::where('invoiceno', 'LIKE', $pattern)
-            ->orderByRaw("CAST(SUBSTRING(invoiceno, LOCATE('/A', invoiceno) + 2) AS UNSIGNED) DESC")
+        // REGEXP so series "B" doesn't also match another driver's "BA..." numbers.
+        $lastDo = static::where('invoiceno', 'LIKE', $base . '%')
+            ->whereRaw('invoiceno REGEXP ?', ['^' . $base . '[0-9]+$'])
+            ->orderByRaw('CAST(SUBSTRING(invoiceno, ?) AS UNSIGNED) DESC', [strlen($base) + 1])
             ->first();
 
-        $lastSeq = $lastDo
-            ? intval(substr($lastDo->invoiceno, strpos($lastDo->invoiceno, '/A') + 2))
-            : 0;
+        $lastSeq = $lastDo ? intval(substr($lastDo->invoiceno, strlen($base))) : 0;
 
         $nextSeq = $lastSeq + 1;
         $digits = max(5, strlen((string) $nextSeq));
 
-        return $doPrefix . $yy . $mm . '/A' . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
+        return $base . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
     }
 
     public function getDateAttribute($value)

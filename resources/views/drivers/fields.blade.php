@@ -28,6 +28,13 @@
     {!! Form::text('phone', null, ['class' => 'form-control', 'maxlength' => 255]) !!}
 </div>
 
+<!-- Offline Series Field -->
+<div class="form-group col-sm-6">
+    {!! Form::label('offline_series', __('drivers.offline_series')) !!}
+    {!! Form::text('offline_series', null, ['class' => 'form-control', 'maxlength' => 3, 'style' => 'text-transform:uppercase', 'placeholder' => __('drivers.offline_series_placeholder')]) !!}
+    <small class="form-text text-muted">{{ __('drivers.offline_series_help') }}</small>
+</div>
+
 <!-- CommissionRate Field -->
 <!-- <div class="form-group col-sm-6">
     {!! Form::label('commissionrate', 'Commission Rate:') !!}<span class="asterisk"> *</span>

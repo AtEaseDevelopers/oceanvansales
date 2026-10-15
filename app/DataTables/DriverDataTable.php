@@ -223,7 +223,12 @@ class DriverDataTable extends DataTable
 
             'remark'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.remark'),
             'data' => 'remark',
-            'name' => 'drivers.remark'])
+            'name' => 'drivers.remark']),
+
+            // Kept last so the index-based columnDefs above (status, on_trip) don't shift.
+            'offline_series'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.offline_series'),
+            'data' => 'offline_series',
+            'name' => 'drivers.offline_series'])
         ];
     }
 
