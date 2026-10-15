@@ -12,7 +12,9 @@ return [
     'date' => 'Date',
     'detail' => 'Detail',
     'download' => 'Download',
-    'driver' => 'Driver',
+    // Swapped to match the menu: the drivers table is shown as "Kelindan" and the
+    // kelindans table as "Driver" (see side_menu.php / drivers.php / kelindans.php).
+    'driver' => 'Kelindan',
     'edit' => 'Edit',
     'edit_invoice' => 'Edit Invoice',
     'group' => 'Group',
@@ -31,7 +33,7 @@ return [
     'invoice_updated_and_assigned_success' => 'Invoice updated and Assigned to driver success',
     'invoice_updated_successfully' => 'Invoice updated Successfully',
     'invoices' => 'Invoices',
-    'kelindan' => 'Kelindan',
+    'kelindan' => 'Driver',
     'no_payment_proof_available' => 'No payment proof available',
     'payment_term' => 'Payment Term',
     'price' => 'Price',
