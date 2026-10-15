@@ -73,6 +73,9 @@ class InvoiceDataTable extends DataTable
                 'dom'       => '<"row"B><"row"<"dataTableBuilderDiv"t>><"row"ip>',
                 'stateSave' => true,
                 'stateDuration' => 0,
+                // Don't restore a remembered sort, so the list always opens newest-created
+                // first (see query()); page length and search filters are still remembered.
+                'stateLoadParams' => 'function (settings, data) { delete data.order; }',
                 'processing' => false,
                 'order'     => [],
                 'lengthMenu' => [[ 10, 50, 100, 300 ],[ '10 rows', '50 rows', '100 rows', '300 rows' ]],
