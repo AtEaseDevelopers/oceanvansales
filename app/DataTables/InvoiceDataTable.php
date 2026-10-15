@@ -51,7 +51,11 @@ class InvoiceDataTable extends DataTable
         ->with('kelindan:id,name')
         ->with('supervisor:id,name')
         ->with('invoicedetail')
-        ->select('invoices.*');
+        ->select('invoices.*')
+        // Newest created first until the user sorts by a column. invoices.date has no
+        // time part and invoice numbers don't sort cleanly as text, so id is the
+        // reliable "latest" order.
+        ->when(empty(request()->input('order')), fn ($query) => $query->orderBy('invoices.id', 'desc'));
     }
 
     /**
@@ -70,7 +74,7 @@ class InvoiceDataTable extends DataTable
                 'stateSave' => true,
                 'stateDuration' => 0,
                 'processing' => false,
-                'order'     => [[2, 'desc']],
+                'order'     => [],
                 'lengthMenu' => [[ 10, 50, 100, 300 ],[ '10 rows', '50 rows', '100 rows', '300 rows' ]],
                 'buttons' => [
                     [
