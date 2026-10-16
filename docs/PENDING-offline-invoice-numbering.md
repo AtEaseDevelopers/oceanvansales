@@ -4,9 +4,9 @@ Written 2026-10-12 so work can continue from another device / Claude account.
 Production SQL in this note is meant to be run by a person on the production DB
 (local dev DB is separate and does not contain this data).
 
-**Status 2026-10-16: PENDING 1 is still open. PENDING 2 is built but switched off** - the
-mobile app broke on the new letters, so offline-data is back on the shared "A" series until
-the app is updated (see that section).
+**Status 2026-10-16: PENDING 1 is still open. PENDING 2 is rebuilt as per-driver number
+ranges inside "A"** (A10001, A20001 ...), which the unchanged mobile app accepts; the earlier
+letter series is gone. Needs `php artisan migrate` on deploy (see that section).
 Related changes since: 41a263e added a content duplicate guard
 (same driver + customer + identical lines returns the saved invoice), and it was then
 narrowed from "same day" to "saved within the last 10 minutes" so genuine repeat
@@ -86,42 +86,63 @@ FROM invoices
 WHERE uuid = '90684405-9216-4444-a406-8782dd52cd07';
 ```
 
-## PENDING 2 - unique offline numbers per driver (BUILT 2026-10-15, SWITCHED OFF 2026-10-16)
+## PENDING 2 - unique offline numbers per driver (per-driver NUMBER RANGES, built 2026-10-16)
 
-**2026-10-16: offline-data was put back on the shared "A" series** because the mobile app
-broke on the per-driver letters (`OC2610/B00001`). The column, backfilled letters, admin
-field and generator support all stay; only `DriverController::offlineData()` now forces
-`Driver::LEGACY_OFFLINE_SERIES`. To switch back on once the app developer confirms the app
-accepts any letter after the `/`, change that one line back to
-`$driver->offline_series ?: Driver::LEGACY_OFFLINE_SERIES`. Until then two offline phones can
-again print the same `A` number (the renumber-on-clash safety net still applies).
+History: a per-driver letter series (`OC2610/B00001`, commit dc1253a) broke the mobile app
+and was switched off in 89eecb9. It is now replaced by number ranges inside "A", which
+works with the unchanged app.
 
-Each driver has their own offline series letter(s) in `drivers.offline_series`, so
-offline numbers look like `OC2610/B00001` (driver with series B), `OC2610/C00001`, ...
-Same shape as the old `OC2610/A00001`, only the letter differs. DOs: `DOOC2610/B00001`.
+**Why letters broke the app (verified in app source):** GitLab waikit.dev/van_sales, tag
+`android|ios/iceProd/1.0.11_26080701` (commit 11069d9), `lib/domain/service/impl/delivery_impl.dart`.
+At Start Trip, *before* the start-trip API, the app calls `offline-data` and does
+`int.parse(runningNo.split("/").last.replaceAll("A", ""))` for `invoice.offline` and
+`delivery_order.offline`. Each offline sale then prints `"OC"`/`"DOOC"` + phone yyMM + `"/A"` +
+`runNo.padLeft(5, "0")` and adds 1. So the app only takes the digits; "OC", yyMM and "/A"
+are hard-coded. Any other letter makes `int.parse` throw and the trip never starts.
 
-- Migration `2026_10_15_000001_add_offline_series_to_drivers_table` adds the column
-  (unique per company) and backfills every existing driver with B, C, D, ... per company
-  in driver id order. **Run `php artisan migrate` on production when deploying.**
-- "A" stays reserved for the old shared series (validation blocks it). Codes run B..Z,
-  then BA..ZZ.
-- Admin: driver create/edit form has an "Offline Invoice Series" field (also on the
-  driver view page and as the last column of the driver list). Blank on create =
-  auto-assign the next free code; blank on edit = keep the current one. Validation:
-  1-3 letters, upper-cased automatically, unique within the company.
-- `offlineData()` passes the driver's series to `Invoice::generateOfflineInvoiceNo()` /
-  `DeliveryOrder::generateOfflineDoNo()`; matching uses REGEXP so series B does not pick
-  up another driver's BA numbers. Online numbering is unaffected (letter-led numbers cast
-  to 0 there). The renumber-on-clash safety net stays.
-- Still to verify on one phone after deploy: the app must use the string from
-  `offline-data` and count up the trailing digits. Expect `.../B00001` then `.../B00002`
-  for the driver with series B. Phones keep an old cached `A` number until their next
-  `offline-data` call, so a clash is still possible briefly after deploy.
-- See which letter each production driver got after migrating:
+**Scheme:** offline number = `A` + (range x 10000 + seq), seq 1..9999 per driver per month,
+invoices and DOs counted separately (`Driver::OFFLINE_RANGE_SIZE`, `offlineNumberBounds()`).
+
+| Driver range | Invoice numbers | DO numbers |
+|---|---|---|
+| 1 | `OC2610/A10001`, `A10002` ... | `DOOC2610/A10001` ... |
+| 2 | `OC2610/A20001` ... | `DOOC2610/A20001` ... |
+| 12 | `OC2610/A120001` ... | `DOOC2610/A120001` ... |
+| none (legacy) | `OC2610/A00001`-`A09999` (old shared block) | same |
+
+- Migration `2026_10_16_000001_replace_offline_series_with_offline_range_on_drivers_table`
+  adds `drivers.offline_range` (unique per company), backfills it (a driver who had a letter
+  keeps its position: B = 1, C = 2, ...; others take the lowest free range in id order) and
+  drops `offline_series`. **Run `php artisan migrate` on production when deploying.**
+- `offlineData()` passes `$driver->offline_range` to `Invoice::generateOfflineInvoiceNo()` /
+  `DeliveryOrder::generateOfflineDoNo()`. Next number = highest saved number inside that
+  driver's block this month + 1 (first = range x 10000 + 1). Legacy only looks at 1-9999, so
+  it never picks up A10001. Passing 9999 in a month throws a clear error (this blocks that
+  driver's Start Trip, since the app calls offline-data first). Online numbering is untouched.
+- Admin: "Offline Number Range" field on the driver form (number, 1-65535, unique per
+  company; blank on create = lowest free range, blank on edit = keep current), plus
+  "Offline Number Range" and "Prints As" (e.g. `A20001, A20002 ...`) on the driver list and
+  view page.
+- Residual risk the server can't remove: if a driver starts a new trip before their offline
+  sales have synced, the server hands the same block start again, so that driver's phone
+  can repeat its own numbers (never another driver's). Changing a driver's range takes
+  effect at their next Start Trip, so don't hand their old range to someone else mid-trip.
+  The renumber-on-clash safety net still applies.
+- Before deploying, check this month's legacy numbers are below 10000 (should be tiny):
 
 ```sql
-SELECT company_id, id, name, offline_series FROM drivers ORDER BY company_id, id;
+SELECT MAX(CAST(SUBSTRING_INDEX(invoiceno,'/A',-1) AS UNSIGNED)) FROM invoices WHERE invoiceno LIKE 'OC2610/A%';
+SELECT MAX(CAST(SUBSTRING_INDEX(invoiceno,'/A',-1) AS UNSIGNED)) FROM deliveryorders WHERE invoiceno LIKE 'DOOC2610/A%';
 ```
+
+- After migrating, see each driver's range:
+
+```sql
+SELECT company_id, id, name, offline_range FROM drivers ORDER BY company_id, id;
+```
+
+- Test on one phone after deploy: Start Trip works, an offline sale prints
+  `OC2610/A{range}0001`, the next one +1.
 
 - Check how the app uses the number (production SQL):
 
