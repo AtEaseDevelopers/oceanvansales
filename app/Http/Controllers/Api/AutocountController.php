@@ -97,7 +97,7 @@ class AutocountController extends Controller
                     $sourceCustomerCode = optional(optional($detail->deliveryorder)->customer)->customer_code;
                     $description = $sourceCustomerCode
                         ? $productName . ' - ' . $sourceCustomerCode
-                        : ($detail->remark ?: $productName);
+                        : $productName;
 
                     // Push the product master alongside the line so the plugin can create the
                     // stock item in AutoCount (when missing) and post a real item line — this
