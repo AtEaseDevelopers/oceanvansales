@@ -28,10 +28,15 @@
     <p>{{ $driver->phone }}</p>
 </div>
 
-<!-- Offline Series Field -->
+<!-- Offline Number Range Field -->
 <div class="form-group">
-    {!! Form::label('offline_series', __('drivers.offline_series')) !!}:
-    <p>{{ $driver->offline_series ?: '-' }}</p>
+    {!! Form::label('offline_range', __('drivers.offline_range')) !!}:
+    <p>{{ $driver->offline_range ?? '-' }}</p>
+</div>
+
+<div class="form-group">
+    {!! Form::label('offline_prints_as', __('drivers.offline_prints_as')) !!}:
+    <p>{{ \App\Models\Driver::offlineRangeExample($driver->offline_range) }}</p>
 </div>
 
 <!-- CommissionRate Field -->
