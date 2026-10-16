@@ -147,29 +147,30 @@ class DeliveryOrder extends Model
 
     /**
      * Generate the next OFFLINE delivery order number for the current company and month.
-     * Format: DO{PREFIX}{YY}{MM}/{SERIES}{SEQUENCE} e.g. DOOC2610/B00001
-     * Mirrors Invoice::generateOfflineInvoiceNo(): $series is the driver's own
-     * offline_series ("A" is the old shared series), and the letter marker keeps it
-     * apart from the online DO numbers from generateDoNo().
+     * Format: DO{PREFIX}{YY}{MM}/A{NUMBER} e.g. DOOC2610/A20001 for a driver with offline range 2.
+     * Mirrors Invoice::generateOfflineInvoiceNo(), counted separately from invoices; a null
+     * $range is the old shared block A00001-A09999. The "A" keeps it apart from the online
+     * DO numbers from generateDoNo().
      */
-    public static function generateOfflineDoNo(string $series = Driver::LEGACY_OFFLINE_SERIES): string
+    public static function generateOfflineDoNo(?int $range = null): string
     {
         $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
         $prefix = Company::INVOICE_PREFIXES[$companyId] ?? 'OX';
-        $base = 'DO' . $prefix . date('y') . date('m') . '/' . $series;
+        $base = 'DO' . $prefix . date('y') . date('m') . '/A';
+        [$first, $last] = Driver::offlineNumberBounds($range);
 
-        // REGEXP so series "B" doesn't also match another driver's "BA..." numbers.
         $lastDo = static::where('invoiceno', 'LIKE', $base . '%')
             ->whereRaw('invoiceno REGEXP ?', ['^' . $base . '[0-9]+$'])
+            ->whereRaw('CAST(SUBSTRING(invoiceno, ?) AS UNSIGNED) BETWEEN ? AND ?', [strlen($base) + 1, $first, $last])
             ->orderByRaw('CAST(SUBSTRING(invoiceno, ?) AS UNSIGNED) DESC', [strlen($base) + 1])
             ->first();
 
-        $lastSeq = $lastDo ? intval(substr($lastDo->invoiceno, strlen($base))) : 0;
+        $nextSeq = $lastDo ? intval(substr($lastDo->invoiceno, strlen($base))) + 1 : $first;
+        if ($nextSeq > $last) {
+            throw new \RuntimeException("Offline DO numbers for range {$range} are used up this month ({$base}{$last}); give the driver another offline number range.");
+        }
 
-        $nextSeq = $lastSeq + 1;
-        $digits = max(5, strlen((string) $nextSeq));
-
-        return $base . str_pad($nextSeq, $digits, '0', STR_PAD_LEFT);
+        return $base . str_pad($nextSeq, 5, '0', STR_PAD_LEFT);
     }
 
     public function getDateAttribute($value)

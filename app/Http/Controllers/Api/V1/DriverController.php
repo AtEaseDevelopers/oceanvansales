@@ -1625,19 +1625,18 @@ class DriverController extends Controller
                 ], 401);
             }
 
-            // Temporarily back on the shared "A" series: the mobile app broke on the
-            // per-driver letters (e.g. OC2610/B00001). Switch to
-            // `$driver->offline_series ?: Driver::LEGACY_OFFLINE_SERIES` once the app
-            // accepts them; each driver's letter is still stored in drivers.offline_series.
-            $series = Driver::LEGACY_OFFLINE_SERIES;
+            // Each driver prints offline numbers from their own block inside "A" (range 1 ->
+            // A10001..., range 2 -> A20001...), so two phones can't print the same number.
+            // The app only parses the digits after "/A" at Start Trip, so the "A" must stay.
+            $range = $driver->offline_range;
             $data = [
                 'invoice' => [
                     'online' => Invoice::generateInvoiceNo(false),
-                    'offline' => Invoice::generateOfflineInvoiceNo(false, $series),
+                    'offline' => Invoice::generateOfflineInvoiceNo(false, $range),
                 ],
                 'delivery_order' => [
                     'online' => DeliveryOrder::generateDoNo(),
-                    'offline' => DeliveryOrder::generateOfflineDoNo($series),
+                    'offline' => DeliveryOrder::generateOfflineDoNo($range),
                 ],
             ];
 

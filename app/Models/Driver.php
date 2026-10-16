@@ -19,9 +19,12 @@ class Driver extends Model
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
 
-    // The old offline invoice series every phone shared, so two drivers could print
-    // the same number. Each driver now gets their own series; "A" stays reserved.
-    const LEGACY_OFFLINE_SERIES = 'A';
+    // Offline invoice/DO numbers are "A" + (offline_range * OFFLINE_RANGE_SIZE + seq), so each
+    // driver prints from their own block: range 1 -> A10001.., range 2 -> A20001... The mobile
+    // app only reads the digits after "/A", so the letter must stay "A". No range = the old
+    // shared A00001-A09999 that every phone drew from.
+    const OFFLINE_RANGE_SIZE = 10000;
+    const OFFLINE_RANGE_MAX = 65535;
 
 
     protected $dates = ['deleted_at'];
@@ -44,7 +47,7 @@ class Driver extends Model
         'remark',
         'session',
         'invoice_runningnumber',
-        'offline_series',
+        'offline_range',
         'trip_id',
         'lorry_id',
     ];
@@ -76,7 +79,7 @@ class Driver extends Model
         'session' => 'string',
         'trip_id' => 'integer',
         'lorry_id' => 'integer',
-        'offline_series' => 'string',
+        'offline_range' => 'integer',
     ];
 
     /**
@@ -109,43 +112,48 @@ class Driver extends Model
     }
 
     /**
-     * Offline series codes in the order they are handed out: B..Z, then BA..ZZ.
+     * First and last sequence number a range may use: null (legacy) -> [1, 9999],
+     * 1 -> [10001, 19999], 2 -> [20001, 29999] ...
      */
-    public static function offlineSeriesCodes(): array
+    public static function offlineNumberBounds(?int $range): array
     {
-        $letters = array_slice(range('A', 'Z'), 1);
-        $codes = $letters;
-        foreach ($letters as $first) {
-            foreach (range('A', 'Z') as $second) {
-                $codes[] = $first . $second;
-            }
-        }
-        return $codes;
+        $start = ($range ?? 0) * self::OFFLINE_RANGE_SIZE;
+        return [$start + 1, $start + self::OFFLINE_RANGE_SIZE - 1];
     }
 
-    public static function offlineSeriesMessages(): array
+    // What the driver's phone prints for a range, e.g. "A20001, A20002 ...", for admin screens.
+    public static function offlineRangeExample(?int $range): string
+    {
+        if (!$range) {
+            return '-';
+        }
+        [$first] = static::offlineNumberBounds($range);
+        return 'A' . $first . ', A' . ($first + 1) . ' ...';
+    }
+
+    public static function offlineRangeMessages(): array
     {
         return [
-            'offline_series.regex'  => 'Offline invoice series must be 1 to 3 letters (A-Z).',
-            'offline_series.not_in' => 'Offline invoice series "' . self::LEGACY_OFFLINE_SERIES . '" is reserved for the old shared series, please use another letter.',
-            'offline_series.unique' => 'This offline invoice series is already used by another driver.',
+            'offline_range.integer' => 'Offline number range must be a whole number.',
+            'offline_range.min'     => 'Offline number range must be 1 or more.',
+            'offline_range.max'     => 'Offline number range can be at most ' . self::OFFLINE_RANGE_MAX . '.',
+            'offline_range.unique'  => 'This offline number range is already used by another driver.',
         ];
     }
 
-    public static function nextFreeOfflineSeries($companyId): ?string
+    public static function nextFreeOfflineRange($companyId): int
     {
         $used = static::withoutGlobalScope('company')
             ->where('company_id', $companyId)
-            ->whereNotNull('offline_series')
-            ->pluck('offline_series')
+            ->whereNotNull('offline_range')
+            ->pluck('offline_range')
             ->all();
 
-        foreach (static::offlineSeriesCodes() as $code) {
-            if (!in_array($code, $used, true)) {
-                return $code;
-            }
+        $range = 1;
+        while (in_array($range, $used)) {
+            $range++;
         }
-        return null;
+        return $range;
     }
 
     public function getFirstVaccineAttribute($value)

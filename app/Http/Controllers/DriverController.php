@@ -67,9 +67,9 @@ class DriverController extends AppBaseController
     public function store(CreateDriverRequest $request)
     {
         $input = $request->all();
-        if (empty($input['offline_series'])) {
+        if (empty($input['offline_range'])) {
             $companyId = app()->bound('current_company_id') ? app('current_company_id') : null;
-            $input['offline_series'] = Driver::nextFreeOfflineSeries($companyId);
+            $input['offline_range'] = Driver::nextFreeOfflineRange($companyId);
         }
 
         $driver = $this->driverRepository->create($input);
@@ -142,9 +142,9 @@ class DriverController extends AppBaseController
         }
 
         $input = $request->all();
-        // Leaving it blank keeps the driver's current series rather than renumbering them.
-        if (empty($input['offline_series'])) {
-            $input['offline_series'] = $driver->offline_series ?: Driver::nextFreeOfflineSeries($driver->company_id);
+        // Leaving it blank keeps the driver's current range rather than renumbering them.
+        if (empty($input['offline_range'])) {
+            $input['offline_range'] = $driver->offline_range ?: Driver::nextFreeOfflineRange($driver->company_id);
         }
 
         $driver = $this->driverRepository->update($input, $id);

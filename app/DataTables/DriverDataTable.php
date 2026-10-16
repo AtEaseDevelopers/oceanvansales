@@ -22,6 +22,7 @@ class DriverDataTable extends DataTable
         return $dataTable
             ->addColumn('lorry_no', fn($driver) => $driver->lorry->lorryno ?? '-')
             ->addColumn('on_trip', fn($driver) => $driver->trip_id ? 'Yes' : 'No')
+            ->addColumn('offline_prints_as', fn($driver) => Driver::offlineRangeExample($driver->offline_range))
             ->addColumn('action', 'drivers.datatables_actions');
     }
 
@@ -226,9 +227,15 @@ class DriverDataTable extends DataTable
             'name' => 'drivers.remark']),
 
             // Kept last so the index-based columnDefs above (status, on_trip) don't shift.
-            'offline_series'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.offline_series'),
-            'data' => 'offline_series',
-            'name' => 'drivers.offline_series'])
+            'offline_range'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.offline_range'),
+            'data' => 'offline_range',
+            'name' => 'drivers.offline_range']),
+
+            'offline_prints_as'=> new \Yajra\DataTables\Html\Column(['title' =>  trans('drivers.offline_prints_as'),
+            'data' => 'offline_prints_as',
+            'name' => 'offline_prints_as',
+            'searchable' => false,
+            'orderable' => false])
         ];
     }
 

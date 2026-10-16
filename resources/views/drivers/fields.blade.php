@@ -28,11 +28,11 @@
     {!! Form::text('phone', null, ['class' => 'form-control', 'maxlength' => 255]) !!}
 </div>
 
-<!-- Offline Series Field -->
+<!-- Offline Number Range Field -->
 <div class="form-group col-sm-6">
-    {!! Form::label('offline_series', __('drivers.offline_series')) !!}
-    {!! Form::text('offline_series', null, ['class' => 'form-control', 'maxlength' => 3, 'style' => 'text-transform:uppercase', 'placeholder' => __('drivers.offline_series_placeholder')]) !!}
-    <small class="form-text text-muted">{{ __('drivers.offline_series_help') }}</small>
+    {!! Form::label('offline_range', __('drivers.offline_range')) !!}
+    {!! Form::number('offline_range', null, ['class' => 'form-control', 'min' => 1, 'max' => \App\Models\Driver::OFFLINE_RANGE_MAX, 'step' => 1, 'placeholder' => __('drivers.offline_range_placeholder')]) !!}
+    <small class="form-text text-muted">{{ __('drivers.offline_range_help') }}</small>
 </div>
 
 <!-- CommissionRate Field -->
