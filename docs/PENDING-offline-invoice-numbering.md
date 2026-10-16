@@ -4,8 +4,9 @@ Written 2026-10-12 so work can continue from another device / Claude account.
 Production SQL in this note is meant to be run by a person on the production DB
 (local dev DB is separate and does not contain this data).
 
-**Status 2026-10-15: PENDING 1 is still open. PENDING 2 is built** (per-driver offline
-series letters, see that section) and needs deploying with `php artisan migrate`.
+**Status 2026-10-16: PENDING 1 is still open. PENDING 2 is built but switched off** - the
+mobile app broke on the new letters, so offline-data is back on the shared "A" series until
+the app is updated (see that section).
 Related changes since: 41a263e added a content duplicate guard
 (same driver + customer + identical lines returns the saved invoice), and it was then
 narrowed from "same day" to "saved within the last 10 minutes" so genuine repeat
@@ -85,7 +86,15 @@ FROM invoices
 WHERE uuid = '90684405-9216-4444-a406-8782dd52cd07';
 ```
 
-## PENDING 2 - unique offline numbers per driver (BUILT 2026-10-15)
+## PENDING 2 - unique offline numbers per driver (BUILT 2026-10-15, SWITCHED OFF 2026-10-16)
+
+**2026-10-16: offline-data was put back on the shared "A" series** because the mobile app
+broke on the per-driver letters (`OC2610/B00001`). The column, backfilled letters, admin
+field and generator support all stay; only `DriverController::offlineData()` now forces
+`Driver::LEGACY_OFFLINE_SERIES`. To switch back on once the app developer confirms the app
+accepts any letter after the `/`, change that one line back to
+`$driver->offline_series ?: Driver::LEGACY_OFFLINE_SERIES`. Until then two offline phones can
+again print the same `A` number (the renumber-on-clash safety net still applies).
 
 Each driver has their own offline series letter(s) in `drivers.offline_series`, so
 offline numbers look like `OC2610/B00001` (driver with series B), `OC2610/C00001`, ...
