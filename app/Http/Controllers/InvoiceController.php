@@ -191,6 +191,7 @@ class InvoiceController extends AppBaseController
     
         $old_payment = $invoice['paymentterm'];
         $old_status = $invoice['status'];
+        $old_autocount_status = $invoice['autocount_status'];
 
         $input = $request->all();
 
@@ -208,6 +209,21 @@ class InvoiceController extends AppBaseController
         }
 
         $invoice = $this->invoiceRepository->update($input, $id);
+
+        // Editing a synced invoice changes what AutoCount holds, so drop it back to
+        // Not Synced and clear the stale sync metadata — the badge stays honest and the
+        // user can push the correction again via the bulk "Sync to AutoCount" button.
+        // (Mirrors DeliveryOrderController::mergeConvert().) Skip when the invoice is being
+        // cancelled, and leave non-synced invoices' status untouched.
+        if($old_autocount_status == Invoice::AUTOCOUNT_SYNCED && $input['status'] != 2)
+        {
+            $invoice->update([
+                'autocount_status'    => Invoice::AUTOCOUNT_NOT_SYNCED,
+                'autocount_docno'     => null,
+                'autocount_error'     => null,
+                'autocount_synced_at' => null,
+            ]);
+        }
 
         if($old_status != 2 && $input['status'] == 2)
         {

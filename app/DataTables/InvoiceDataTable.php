@@ -34,6 +34,14 @@ class InvoiceDataTable extends DataTable
             });
         }
 
+        // AutoCount status is a 0-3 enum; filter by exact value (dropdown) rather than the
+        // default LIKE so e.g. picking "Failed" (3) can never partial-match another state.
+        $dataTable->filterColumn('invoices.autocount_status', function ($query, $keyword) {
+            if ($keyword !== '' && is_numeric($keyword)) {
+                $query->where('invoices.autocount_status', (int) $keyword);
+            }
+        });
+
         return $dataTable->addColumn('action', 'invoices.datatables_actions');
     }
 
@@ -185,6 +193,8 @@ class InvoiceDataTable extends DataTable
                                 var input = \'<input type="text" id="\'+index+\'Date" onclick="searchDateColumn(this);" placeholder="Search ">\';
                             }else if(columns[index].title == \'Group\'){
                                 var input = \'<select id="group" class="border-0" style="width: 100%;"><option value=""></option></select>\';
+                            }else if(columns[index].title == \'AutoCount\'){
+                                var input = \'<select class="border-0" style="width: 100%;"><option value=""></option><option value="0">Not Synced</option><option value="1">Queued</option><option value="2">Synced</option><option value="3">Failed</option></select>\';
                             }else{
                                 var input = \'<input type="text" placeholder="Search ">\';
                             }
@@ -273,7 +283,9 @@ class InvoiceDataTable extends DataTable
                 'title' => 'AutoCount',
                 'data' => 'autocount_status',
                 'name' => 'invoices.autocount_status',
-                'searchable' => false
+                // Searchable so the footer renders a status dropdown (see initComplete);
+                // ordering stays disabled via columnDefs target 9.
+                'searchable' => true
             ]),
         ];
 

@@ -156,6 +156,65 @@ class AutocountSyncTest extends TestCase
     }
 
     /** @test */
+    public function editing_a_synced_invoice_resets_it_to_not_synced()
+    {
+        // A Synced invoice is now editable. Saving an edit must drop its sync status back to
+        // Not Synced and clear the stale docno/synced_at so the badge is honest and the user
+        // can push the correction again via the bulk "Sync to AutoCount" button.
+        $synced = $this->makeInvoice([
+            'paymentterm'         => '2',
+            'status'              => 1,
+            'autocount_status'    => Invoice::AUTOCOUNT_SYNCED,
+            'autocount_docno'     => 'INV-0000123',
+            'autocount_synced_at' => now(),
+        ]);
+
+        $response = $this->withoutMiddleware()->put(route('invoices.update', \Crypt::encrypt($synced)), [
+            'invoiceno'   => 'OS2607/00001',
+            'date'        => '2026-07-01',
+            'customer_id' => 1,
+            'paymentterm' => '2',   // unchanged, non-cash -> skips payment-term reconciliation
+            'status'      => 1,
+            'driver_id'   => '',    // skips task/trip assignment
+            'method'      => 1,
+        ]);
+
+        $response->assertStatus(302);
+
+        $row = DB::table('invoices')->find($synced);
+        $this->assertEquals(Invoice::AUTOCOUNT_NOT_SYNCED, $row->autocount_status);
+        $this->assertNull($row->autocount_docno);
+        $this->assertNull($row->autocount_synced_at);
+    }
+
+    /** @test */
+    public function editing_a_non_synced_invoice_leaves_its_autocount_status_untouched()
+    {
+        // Only a previously-Synced invoice is reset on edit; a Failed (or Queued/Not Synced)
+        // invoice keeps its status so editing doesn't silently clear a pending/failed state.
+        $failed = $this->makeInvoice([
+            'paymentterm'      => '2',
+            'status'           => 1,
+            'autocount_status' => Invoice::AUTOCOUNT_FAILED,
+            'autocount_error'  => 'Debtor not found',
+        ]);
+
+        $this->withoutMiddleware()->put(route('invoices.update', \Crypt::encrypt($failed)), [
+            'invoiceno'   => 'OS2607/00001',
+            'date'        => '2026-07-01',
+            'customer_id' => 1,
+            'paymentterm' => '2',
+            'status'      => 1,
+            'driver_id'   => '',
+            'method'      => 1,
+        ])->assertStatus(302);
+
+        $row = DB::table('invoices')->find($failed);
+        $this->assertEquals(Invoice::AUTOCOUNT_FAILED, $row->autocount_status);
+        $this->assertEquals('Debtor not found', $row->autocount_error);
+    }
+
+    /** @test */
     public function queue_autocount_requires_at_least_one_id()
     {
         $this->withoutMiddleware()
