@@ -134,8 +134,10 @@
                 @php
                     $totalamount = ($totalamount ?? 0) + $invoicedetail['totalprice'];
                     $productName = $invoicedetail['product']['name'] ?? '';
-                    $sourceCustomerCode = $invoicedetail['deliveryorder']['customer']['customer_code'] ?? null;
-                    $itemLabel = $sourceCustomerCode ? ($productName . ' - ' . $sourceCustomerCode) : $productName;
+                    // Converted lines show the INVOICE customer's code (the account chosen
+                    // at conversion), not the source DO outlet's code.
+                    $billedCustomerCode = !empty($invoicedetail['deliveryorder']) ? ($invoice['customer']['customer_code'] ?? null) : null;
+                    $itemLabel = $billedCustomerCode ? ($productName . ' - ' . $billedCustomerCode) : $productName;
                     $poNo = $invoicedetail['deliveryorder']['invoiceno'] ?? '';
                 @endphp
                 <tr>

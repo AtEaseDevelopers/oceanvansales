@@ -86,17 +86,17 @@ class AutocountController extends Controller
             $customer = Customer::find($invoice->customer_id);
 
             $details = InvoiceDetail::with('deliveryorder.customer')
-                ->where('invoice_id', $invoice->id)->get()->map(function ($detail) {
+                ->where('invoice_id', $invoice->id)->get()->map(function ($detail) use ($customer) {
                     $product = Product::find($detail->product_id);
                     $productName = $product->name ?? '';
 
                     // Lines converted from a Delivery Order carry the source DO. Its number
-                    // becomes the AutoCount line's "Our D/O No.", and its (sub-)customer code
-                    // is appended to the product name so the synced description matches the
-                    // printed invoice exactly ("AIS HANCUR - SA12"). See invoices.print_converted.
-                    $sourceCustomerCode = optional(optional($detail->deliveryorder)->customer)->customer_code;
-                    $description = $sourceCustomerCode
-                        ? $productName . ' - ' . $sourceCustomerCode
+                    // becomes the AutoCount line's "Our D/O No.", and the INVOICE customer's
+                    // code (the account chosen at conversion, not the DO's outlet) is appended
+                    // to the product name so the synced description matches the printed
+                    // invoice exactly ("AIS HANCUR - SA4"). See invoices.print_converted.
+                    $description = ($detail->deliveryorder && !empty($customer->customer_code))
+                        ? $productName . ' - ' . $customer->customer_code
                         : $productName;
 
                     // Push the product master alongside the line so the plugin can create the
