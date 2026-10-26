@@ -430,8 +430,8 @@ class DeliveryOrderController extends AppBaseController
 
     /**
      * Combine the selected Delivery Orders' items into a single Invoice.
-     * The Invoice's customer is always fixed to "ANEKA INTERTRADE MARKETING SDN BHD",
-     * regardless of each DO's own (outlet-specific) customer.
+     * The Invoice keeps the DOs' own customer, so all selected DOs must belong
+     * to the same customer (an invoice can only bill one account).
      */
     public function combineConvert(Request $request)
     {
@@ -450,10 +450,15 @@ class DeliveryOrderController extends AppBaseController
             return response()->json(['message' => 'Selected delivery order(s) are already converted or not found.'], 422);
         }
 
-        $customer = Customer::where('company', 'ANEKA INTERTRADE MARKETING SDN BHD')->first();
+        $customerIds = $deliveryOrders->pluck('customer_id')->unique();
+        if ($customerIds->count() > 1) {
+            return response()->json(['message' => 'Selected delivery orders belong to different customers. Please select delivery orders of the same customer only.'], 422);
+        }
+
+        $customer = Customer::find($customerIds->first());
 
         if (empty($customer)) {
-            return response()->json(['message' => 'Fixed customer "ANEKA INTERTRADE MARKETING SDN BHD" not found. Please create it first.'], 422);
+            return response()->json(['message' => 'The delivery orders\' customer was not found.'], 422);
         }
 
         DB::beginTransaction();
