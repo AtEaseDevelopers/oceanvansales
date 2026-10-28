@@ -22,6 +22,9 @@
                              <button type="button" class="btn btn-success btn-sm pull-right mr-2" id="syncautocount" title="Sync selected invoices to AutoCount">
                                 <i class="fa fa-cloud-upload"></i> Sync to AutoCount
                              </button>
+                             <button type="button" class="btn btn-warning btn-sm pull-right mr-2" id="markautocount" title="Change AutoCount status for selected invoices">
+                                <i class="fa fa-pencil"></i> Change AC Status
+                             </button>
                             @einvoice
                              <button type="button" class="btn btn-primary btn-sm pull-right mr-2" onclick="submitEinvoice()" title="Submit E-Invoice">
                                 <i class="fa fa-file-text-o"></i> Submit E-Invoice
@@ -233,6 +236,45 @@
                 error: function(error) {
                     HideLoad();
                     noti('e','Please contact your administrator', error.responseJSON?.message || 'Failed to queue invoices');
+                }
+            });
+        }
+
+        $(document).on("click", "#markautocount", function(e){
+            if(window.checkboxid.length == 0){
+                noti('i','Info','Please select at least one row');
+                return;
+            }
+            var n = window.checkboxid.length;
+            $.confirm({
+                title: 'Change AutoCount Status',
+                content: 'Set the AutoCount status for ' + n + ' selected invoice(s):',
+                buttons: {
+                    Synced: function() {
+                        markautocount(window.checkboxid, 2);
+                    },
+                    somethingElse: {
+                        text: 'Cancel',
+                        btnClass: 'btn-gray',
+                        keys: ['enter', 'shift']
+                    }
+                }
+            });
+        });
+        function markautocount(ids, status){
+            ShowLoad();
+            $.ajax({
+                url: "{{ url('/invoices/mark-autocount') }}",
+                type: "POST",
+                data: { ids: ids, status: status, _token: "{{ csrf_token() }}" },
+                success: function(response){
+                    window.checkboxid = [];
+                    $('.buttons-reload').click();
+                    noti('s','AutoCount Status Updated', response.message);
+                },
+                error: function(error) {
+                    HideLoad();
+                    noti('e','Please contact your administrator', error.responseJSON?.message || 'Failed to update status');
                 }
             });
         }

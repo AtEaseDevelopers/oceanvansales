@@ -540,6 +540,41 @@ class InvoiceController extends AppBaseController
         ]);
     }
 
+    /**
+     * Manually set the AutoCount status of the selected invoices.
+     * Used when an invoice was reconciled directly inside AutoCount (without the plugin),
+     * so the listing can reflect it. The status is passed in and validated against the
+     * allowed set, so more target statuses can be exposed later without a new endpoint.
+     */
+    public function markAutocount(Request $request)
+    {
+        $ids    = $request->input('ids', []);
+        $status = (int) $request->input('status');
+
+        if (empty($ids)) {
+            return response()->json(['message' => 'Please select at least one invoice.'], 422);
+        }
+
+        // Only manual "Synced" marking is supported for now.
+        if ($status !== Invoice::AUTOCOUNT_SYNCED) {
+            return response()->json(['message' => 'Invalid AutoCount status.'], 422);
+        }
+
+        // Cancelled invoices are never synced to AutoCount, even if selected.
+        $count = Invoice::whereIn('id', $ids)
+            ->where('status', '!=', 2)
+            ->update([
+                'autocount_status'    => Invoice::AUTOCOUNT_SYNCED,
+                'autocount_error'     => null,
+                'autocount_synced_at' => now(),
+            ]);
+
+        return response()->json([
+            'message' => $count . ' invoice(s) marked as synced.',
+            'count'   => $count,
+        ]);
+    }
+
     public function getcustomer($id)
     {
         $customer = Customer::where('id',$id)->first();
