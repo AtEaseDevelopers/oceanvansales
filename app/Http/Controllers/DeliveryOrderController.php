@@ -429,9 +429,12 @@ class DeliveryOrderController extends AppBaseController
     }
 
     /**
-     * Combine the selected Delivery Orders' items into a single Invoice.
-     * The Invoice keeps the DOs' own customer, so all selected DOs must belong
-     * to the same customer (an invoice can only bill one account).
+     * Combine the selected Delivery Orders' items into a single Invoice billed to the
+     * plain head account "ANEKA INTERTRADE MARKETING SDN BHD" (no product prefix or
+     * outlet code in its name). Outlet customers may differ between the selected DOs,
+     * but they must all carry the same product name — the "(...)" prefix of the DO
+     * customer's company name, e.g. "(BABY AIS) ANEKA ... - ST1" -> "BABY AIS" —
+     * so BABY AIS outlets combine together but never with AIS HANCUR / BABY ICE DOs.
      */
     public function combineConvert(Request $request)
     {
@@ -441,7 +444,7 @@ class DeliveryOrderController extends AppBaseController
             return response()->json(['message' => 'Please select at least one delivery order.'], 422);
         }
 
-        $deliveryOrders = DeliveryOrder::with('deliveryorderdetail')
+        $deliveryOrders = DeliveryOrder::with(['deliveryorderdetail', 'customer'])
             ->whereIn('id', $ids)
             ->whereNull('invoice_id')
             ->get();
@@ -450,15 +453,26 @@ class DeliveryOrderController extends AppBaseController
             return response()->json(['message' => 'Selected delivery order(s) are already converted or not found.'], 422);
         }
 
-        $customerIds = $deliveryOrders->pluck('customer_id')->unique();
-        if ($customerIds->count() > 1) {
-            return response()->json(['message' => 'Selected delivery orders belong to different customers. Please select delivery orders of the same customer only.'], 422);
+        // "(BABY AIS) ANEKA ... - ST1" -> "BABY AIS"; a name with no "(...)" prefix
+        // groups under its full company name.
+        $productNameOf = function ($deliveryOrder) {
+            $company = trim((string) optional($deliveryOrder->customer)->company);
+            return preg_match('/^\((.*?)\)/', $company, $m) ? trim($m[1]) : $company;
+        };
+
+        $groups = $deliveryOrders->groupBy($productNameOf);
+        if ($groups->count() > 1) {
+            $detail = $groups->map(function ($dos, $name) {
+                return ($name !== '' ? $name : 'No product name') . ': ' . $dos->pluck('invoiceno')->implode(', ');
+            })->implode(' | ');
+
+            return response()->json(['message' => 'Selected delivery orders have different product names — ' . $detail . '. Please select delivery orders with the same product name only.'], 422);
         }
 
-        $customer = Customer::find($customerIds->first());
+        $customer = Customer::where('company', 'ANEKA INTERTRADE MARKETING SDN BHD')->first();
 
         if (empty($customer)) {
-            return response()->json(['message' => 'The delivery orders\' customer was not found.'], 422);
+            return response()->json(['message' => 'Billing customer "ANEKA INTERTRADE MARKETING SDN BHD" not found. Please create it first.'], 422);
         }
 
         DB::beginTransaction();
