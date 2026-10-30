@@ -18,6 +18,9 @@ class Kernel extends ConsoleKernel
         // $schedule->command('inspire')->hourly();
         $schedule->command('CronJob:updatedo')
         ->everyMinute();
+        $schedule->command('CronJob:pruneapilogs')
+        ->lastDayOfMonth('23:00')
+        ->withoutOverlapping();
     }
 
     /**
