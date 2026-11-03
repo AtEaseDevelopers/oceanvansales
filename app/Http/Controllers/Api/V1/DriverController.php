@@ -944,7 +944,9 @@ class DriverController extends Controller
             if(count($task) != 0){
                 $message = true;
                 foreach($task as $c=>$t){
-                    if(asset($t['customer']['id'])){
+                    // isset (not asset): a task whose customer was deleted or belongs to
+                    // another company has a null customer — skip enrichment instead of 500
+                    if(isset($t['customer']['id'])){
                         $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
                         $products = DB::table('products')
@@ -1059,7 +1061,9 @@ class DriverController extends Controller
             if(count($task) != 0){
                 $message = true;
                 foreach($task as $c=>$t){
-                    if(asset($t['customer']['id'])){
+                    // isset (not asset): a task whose customer was deleted or belongs to
+                    // another company has a null customer — skip enrichment instead of 500
+                    if(isset($t['customer']['id'])){
                         $task[$c]['customer']['credit'] = $this->getCustomerCreditByDate($t['customer']['id'], date('Y-m-d H:i:s'));
                         // $task[$c]['customer']['credit'] = $t['customer']['id'];
                         $products = DB::table('products')
