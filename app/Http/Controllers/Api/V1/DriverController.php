@@ -417,7 +417,9 @@ class DriverController extends Controller
                     Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
                     Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
                     //generate task
-                    $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
+                    $assigns = Assign::where('lorry_id', $data['lorry_id'])
+                        ->whereHas('customer', function ($q) { $q->where('status', 1); })
+                        ->orderby('sequence','asc')->get()->toarray();
                     $count = 1;
                     foreach($assigns as $assign){
                         $task = new Task();
@@ -471,7 +473,9 @@ class DriverController extends Controller
                 Driver::where('id', $driver->id)->update(['trip_id' => $newtrip->id, 'lorry_id' => $data['lorry_id']]);
                 Lorry::where('id', $data['lorry_id'])->update(['status' => 0]);
                 //generate task
-                $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
+                $assigns = Assign::where('lorry_id', $data['lorry_id'])
+                        ->whereHas('customer', function ($q) { $q->where('status', 1); })
+                        ->orderby('sequence','asc')->get()->toarray();
                 $count = 1;
                 foreach($assigns as $assign){
                     $task = new Task();
@@ -712,7 +716,9 @@ class DriverController extends Controller
                     $newtrip->date = date("Y-m-d H:i:s");
                     $newtrip->save();
                     //generate task
-                    $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
+                    $assigns = Assign::where('lorry_id', $data['lorry_id'])
+                        ->whereHas('customer', function ($q) { $q->where('status', 1); })
+                        ->orderby('sequence','asc')->get()->toarray();
                     $count = 1;
                     foreach($assigns as $assign){
                         $task = new Task();
@@ -758,7 +764,9 @@ class DriverController extends Controller
                 $newtrip->date = date("Y-m-d H:i:s");
                 $newtrip->save();
                 //generate task
-                $assigns = Assign::where('lorry_id', $data['lorry_id'])->orderby('sequence','asc')->get()->toarray();
+                $assigns = Assign::where('lorry_id', $data['lorry_id'])
+                        ->whereHas('customer', function ($q) { $q->where('status', 1); })
+                        ->orderby('sequence','asc')->get()->toarray();
                 $count = 1;
                 foreach($assigns as $assign){
                     $task = new Task();
@@ -3651,6 +3659,7 @@ class DriverController extends Controller
             if($fromdrivertrip->type == 2){
                 //Take from assign & invoice
                 $assigns = Assign::where('lorry_id', $fromdrivertrip->lorry_id)
+                ->whereHas('customer', function ($q) { $q->where('status', 1); })
                 ->orderby('sequence','asc')
                 ->select('customer_id','sequence',DB::RAW('0 as invoice_id'));
                 $task = Invoice::where('driver_id', $fromdriver->id)
@@ -3681,6 +3690,7 @@ class DriverController extends Controller
         }else{
             //Take from assign & invoice
             $assigns = Assign::where('lorry_id', $fromdriver->lorry_id)
+            ->whereHas('customer', function ($q) { $q->where('status', 1); })
             ->orderby('sequence','asc')
             ->select('customer_id','sequence',DB::RAW('0 as invoice_id'));
             $task = Invoice::where('driver_id', $fromdriver->id)

@@ -175,37 +175,13 @@ class CustomerController extends AppBaseController
             return redirect(route('customers.index'));
         }
 
-        $Invoice = Invoice::where('customer_id',$id)->get()->toArray();
-        if(count($Invoice)>0){
-            Flash::error('Unable to delete '.$customer->name.', '.$customer->name.' is being used in Invoice');
+        // Never hard-delete: history (invoices, DOs, tasks) must keep resolving the
+        // customer, so "delete" deactivates instead. Inactive customers are excluded
+        // from task generation at the next trip start.
+        $customer->status = 0;
+        $customer->save();
 
-            return redirect(route('customers.index'));
-        }
-
-        $SpecialPrice = SpecialPrice::where('customer_id',$id)->get()->toArray();
-        if(count($SpecialPrice)>0){
-            Flash::error('Unable to delete '.$customer->name.', '.$customer->name.' is being used in Special Price');
-
-            return redirect(route('customers.index'));
-        }
-
-        $foc = foc::where('customer_id',$id)->get()->toArray();
-        if(count($foc)>0){
-            Flash::error('Unable to delete '.$customer->name.', '.$customer->name.' is being used in Foc');
-
-            return redirect(route('customers.index'));
-        }
-
-        $Assign = Assign::where('customer_id',$id)->get()->toArray();
-        if(count($Assign)>0){
-            Flash::error('Unable to delete '.$customer->name.', '.$customer->name.' is being used in Assign');
-
-            return redirect(route('customers.index'));
-        }
-
-        $this->customerRepository->delete($id);
-
-        Flash::success($customer->company.__('customers.deleted_successfully'));
+        Flash::success($customer->company.' deactivated successfully.');
 
         return redirect(route('customers.index'));
     }
@@ -218,30 +194,14 @@ class CustomerController extends AppBaseController
         $count = 0;
 
         foreach ($ids as $id) {
-
-            $Invoice = Invoice::where('customer_id',$id)->get()->toArray();
-            if(count($Invoice)>0){
-                continue;
+            // Deactivate instead of hard-delete — see destroy(). Saved per model so
+            // each change fires events and lands in activity_logs.
+            $customer = Customer::find($id);
+            if ($customer && $customer->status != 0) {
+                $customer->status = 0;
+                $customer->save();
+                $count++;
             }
-
-            $SpecialPrice = SpecialPrice::where('customer_id',$id)->get()->toArray();
-            if(count($SpecialPrice)>0){
-                continue;
-            }
-
-            $foc = foc::where('customer_id',$id)->get()->toArray();
-            if(count($foc)>0){
-                continue;
-            }
-
-            $Assign = Assign::where('customer_id',$id)->get()->toArray();
-            if(count($Assign)>0){
-                continue;
-            }
-
-            $customer = $this->customerRepository->find($id);
-
-            $count = $count + Customer::destroy($id);
         }
 
         return $count;
